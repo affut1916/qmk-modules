@@ -93,6 +93,16 @@ static void deactivate_all(void) {
     }
 }
 
+// A key release is activity too: restart the idle timeout so that a long
+// keypress does not expire the moment it is let go.
+static void refresh_activity(void) {
+    for (uint8_t i = 0; i < SMART_LAYER_MAX_ACTIVE; i++) {
+        if (active[i].active && !active[i].locked) {
+            active[i].last_activity = timer_read();
+        }
+    }
+}
+
 static bool continue_list_match(const smart_active_t *slot, uint16_t keycode) {
     for (uint8_t i = 0; i < slot->continue_list_size; i++) {
         if (slot->continue_list[i] == keycode) {
@@ -238,6 +248,7 @@ bool process_record_smart_layer(uint16_t keycode, keyrecord_t *record) {
         if (held_key_count > 0) {
             held_key_count--;
         }
+        refresh_activity();
         return false;
     }
 
@@ -254,8 +265,11 @@ bool process_record_smart_layer(uint16_t keycode, keyrecord_t *record) {
     if (IS_KEYEVENT(record->event)) {
         if (pressed) {
             held_key_count++;
-        } else if (held_key_count > 0) {
-            held_key_count--;
+        } else {
+            if (held_key_count > 0) {
+                held_key_count--;
+            }
+            refresh_activity();
         }
     }
 
