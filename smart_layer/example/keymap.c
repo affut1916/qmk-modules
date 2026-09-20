@@ -9,9 +9,10 @@
 //   1  NAV
 //   2  NUM
 //
-// Slot 0 (SL(0)) : tap  = smart layer 2 (Num), double tap = lock, hold = MO(2)
-// Slot 1 (SLT(1)): tap  = KC_TAB,             hold = smart layer 1 (Nav)
-// A plain LT(1, KC_SPC) is included to show native LT coexistence.
+// Triggers are ordinary LT keys:
+//   SL_NUM  = LT(NUM, KC_NO)   tap = sticky Num (double-tap locks), hold = MO(NUM)
+//   SLT_TAB = LT(NAV, KC_TAB)  tap = Tab, hold = sticky Nav
+// A plain LT(NAV, KC_SPC) coexists and behaves natively.
 
 #include QMK_KEYBOARD_H
 
@@ -19,19 +20,29 @@
 
 enum layers { BASE, NAV, NUM };
 
-const smart_layer_config_t smart_layer_configs[SMART_LAYER_SLOT_COUNT] = {
-    [0] = {.layer = NUM, .tap = KC_NO, .timeout = SMART_LAYER_TIMEOUT_DEFAULT, .lock_enable = SMART_LAYER_USE_DEFAULT, .swallow_exit = SMART_LAYER_USE_DEFAULT},
-    [1] = {.layer = NAV, .tap = KC_TAB, .timeout = SMART_LAYER_TIMEOUT_DEFAULT, .lock_enable = SMART_LAYER_USE_DEFAULT, .swallow_exit = SMART_LAYER_USE_DEFAULT},
-    // Remaining slots fall back to "layer = slot, no tap, default timeout".
-};
+#define SL_NUM LT(NUM, KC_NO)
+#define SLT_TAB LT(NAV, KC_TAB)
+
+smart_layer_mode_t smart_layer_get(uint16_t keycode, smart_layer_config_t *cfg) {
+    // `cfg` arrives pre-filled with the defaults; override as needed.
+    switch (keycode) {
+        case SL_NUM:
+            return SMART_LAYER_SL; // Double-tap lock is controlled by
+                                   // SMART_LAYER_SL_DOUBLE_TAP_LOCK (default on).
+        case SLT_TAB:
+            cfg->timeout = 500; // Override the default 300 ms.
+            return SMART_LAYER_SLT;
+    }
+    return SMART_LAYER_NONE;
+}
 
 // clang-format off
 const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
     [BASE] = LAYOUT(
-        KC_Q,    KC_W,   KC_E,   KC_R,   KC_T,
-        KC_A,    KC_S,   KC_D,   KC_F,   KC_G,
-        KC_Z,    KC_X,   KC_C,   KC_V,   KC_B,
-        SL(0),   SLT(1), LT(NAV, KC_SPC), SL_OFF
+        KC_Q,     KC_W,   KC_E,   KC_R,   KC_T,
+        KC_A,     KC_S,   KC_D,   KC_F,   KC_G,
+        KC_Z,     KC_X,   KC_C,   KC_V,   KC_B,
+        SL_NUM,   SLT_TAB, LT(NAV, KC_SPC), SL_OFF
     ),
     [NAV] = LAYOUT(
         _______, _______, _______, _______, _______,

@@ -3,17 +3,14 @@
 //
 // Smart Layer -- community module.
 //
-// NOTE: QMK force-includes every community module's config.h early, before the
+// QMK force-includes every community module's config.h early, before the
 // keyboard / user / keymap config.h. To keep every option overridable, this
-// file intentionally defines nothing; all defaults and the SMART_LAYER_* switch
-// guards live in smart_layer.h, which is included after config.h in each
-// translation unit.
+// file defines nothing; the defaults live in smart_layer.h behind #ifndef
+// guards and can be overridden from your keymap's config.h:
 //
-// Override from your keymap's config.h, for example:
-//
-//   #define SMART_LAYER_SLOT_COUNT 8
+//   #define SMART_LAYER_MAX_ACTIVE 8
 //   #define SMART_LAYER_DEFAULT_TIMEOUT 300
-//   #define SMART_LAYER_SL_CHORDAL_HOLD 1
-//   #define SMART_LAYER_SLT_FLOW_TAP 0
+//   #define SMART_LAYER_SWALLOW_EXIT 0
+//   #define SMART_LAYER_SL_DOUBLE_TAP_LOCK 1
 
 #pragma once

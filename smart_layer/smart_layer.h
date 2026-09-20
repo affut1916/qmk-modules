@@ -1,185 +1,102 @@
 // Copyright 2026 qmk-modules
 // SPDX-License-Identifier: GPL-2.0-or-later
 //
-// Smart Layer for QMK -- a port of urob's zmk-auto-layer / smart layers.
+// Smart Layer -- thin community module.
 //
-// Two distinct keys share one per-slot configuration table:
+// The tap/hold decision is left entirely to QMK core: you declare triggers as
+// ordinary Layer-Tap keys and the module only rewrites the half it cares about.
+// That means every tap-hold feature works natively and with zero configuration
+// (PERMISSIVE_HOLD, HOLD_ON_OTHER_KEY_PRESS, CHORDAL_HOLD, FLOW_TAP_TERM,
+// SPECULATIVE_HOLD, get_tapping_term(), QUICK_TAP_TERM, ...).
 //
-//   SL(slot)   tap  = activate the smart layer (sticky, auto-off)
-//              dbl  = lock the layer (disable timeout + whitelist exit; tap again to unlock)
-//              hold = MO(config.layer)
+// Two trigger flavours, both plain LT keys:
 //
-//   SLT(slot)  tap  = config.tap
-//              dbl  = LT-style quick tap (tap, then press-and-hold within the quick-tap
-//                     window repeats config.tap; no third/lock state)
-//              hold = activate the smart layer (sticky, auto-off)
+//   SL  = LT(layer, KC_NO)   tap  = activate a sticky layer (toggle/lock)
+//                            hold = native MO(layer)
 //
-// Plain LT/MO/TG/TT keep their native QMK behaviour and can be used on the same layer.
+//   SLT = LT(layer, kc)      tap  = native kc (including native quick-tap)
+//                            hold = activate a sticky layer
 //
-// Configure the slots in your keymap:
+// A sticky layer stays on until one of:
+//   * a key press that is not "part of" the layer (see the whitelist below),
+//   * the idle timeout (default SMART_LAYER_DEFAULT_TIMEOUT) elapses, or
+//   * SL_OFF is pressed.
 //
-//   const smart_layer_config_t smart_layer_configs[SMART_LAYER_SLOT_COUNT] = {
-//       [0] = { .layer = 3, .tap = KC_TAB },                 // SLT(0)/SL(0) -> layer 3
-//       [1] = { .layer = 4, .tap = KC_NO, .timeout = 0 },    // SL(1): no timeout
-//   };
+// Smart layers are independent: activating one never turns another off. Each is
+// closed on its own by ordinary key presses (per the whitelist), its timeout,
+// or SL_OFF. The layer-activation halves of the triggers (SL tap/hold, SLT
+// hold) do not count as ordinary presses. An SLT tap is an ordinary key (it
+// really sends `kc`) and therefore does participate in the whitelist.
 //
-// Toggle the HRM participation of each group in your config.h, e.g.
-//   #define SMART_LAYER_SL_CHORDAL_HOLD 1
-//   #define SMART_LAYER_SLT_FLOW_TAP 0
+// Default whitelist: a key keeps the layer on when the target layer defines a
+// non-transparent keycode at that position. Add extra keycodes with
+// smart_layer_config_t.continue_list.
+//
+// IMPORTANT: leave each trigger's own position transparent on the layer it
+// activates, so the trigger keeps resolving to the same LT key and can be
+// toggled off / re-held.
+//
+// Declare your triggers from keymap.c:
+//
+//   #define SL_NUM  LT(NUM, KC_NO)
+//   #define SLT_TAB LT(NAV, KC_TAB)
+//
+//   smart_layer_mode_t smart_layer_get(uint16_t keycode,
+//                                      smart_layer_config_t *cfg) {
+//     switch (keycode) {   // `cfg` is pre-filled; only change what you need.
+//       case SL_NUM:  return SMART_LAYER_SL;
+//       case SLT_TAB: cfg->timeout = 500; return SMART_LAYER_SLT;
+//     }
+//     return SMART_LAYER_NONE;
+//   }
+//
+// Requires QMK_KEYBOARD_H (which pulls in community_modules.h) to be included
+// before this header so SMART_LAYER_OFF is in scope.
 
 #pragma once
 
 #include <stdint.h>
 #include <stdbool.h>
 
-// Number of independent slots. Matches the number of SLT_n / SL_n keycodes.
-#ifndef SMART_LAYER_SLOT_COUNT
-#    define SMART_LAYER_SLOT_COUNT 16
+// Maximum number of sticky layers tracked at the same time. This is unrelated
+// to how many layers exist (that is MAX_LAYER).
+#ifndef SMART_LAYER_MAX_ACTIVE
+#    define SMART_LAYER_MAX_ACTIVE 8
 #endif
 
-// Slot timeout in milliseconds after the last key activity. 0 disables the timeout.
+// Default idle timeout for a sticky layer, in milliseconds.
 #ifndef SMART_LAYER_DEFAULT_TIMEOUT
-#    define SMART_LAYER_DEFAULT_TIMEOUT 300
+#    define SMART_LAYER_DEFAULT_TIMEOUT 3000
 #endif
 
-// Sentinel meaning "use SMART_LAYER_DEFAULT_TIMEOUT".
-#define SMART_LAYER_TIMEOUT_DEFAULT 0xFFFF
-// Sentinel for the per-slot tri-state overrides.
-#define SMART_LAYER_USE_DEFAULT (-1)
-
-// ---- Per-group HRM participation switches ----------------------------------
-// Defaults follow the corresponding QMK feature, but each can be forced on/off
-// from config.h. The `#ifndef` guards let a config.h definition win, because
-// config.h is processed before this header is included.
-
-#ifndef SMART_LAYER_SL_PERMISSIVE_HOLD
-#    if defined(PERMISSIVE_HOLD) || defined(PERMISSIVE_HOLD_PER_KEY)
-#        define SMART_LAYER_SL_PERMISSIVE_HOLD 1
-#    else
-#        define SMART_LAYER_SL_PERMISSIVE_HOLD 0
-#    endif
+// Default for whether the key that triggers an automatic exit is swallowed
+// (not sent to the host).
+#ifndef SMART_LAYER_SWALLOW_EXIT
+#    define SMART_LAYER_SWALLOW_EXIT 0
 #endif
 
-#ifndef SMART_LAYER_SL_HOLD_ON_OTHER_KEY_PRESS
-#    if defined(HOLD_ON_OTHER_KEY_PRESS) || defined(HOLD_ON_OTHER_KEY_PRESS_PER_KEY)
-#        define SMART_LAYER_SL_HOLD_ON_OTHER_KEY_PRESS 1
-#    else
-#        define SMART_LAYER_SL_HOLD_ON_OTHER_KEY_PRESS 0
-#    endif
-#endif
-
-// SL's tap is a layer action, not a character, so chordal hold (positional
-// same-hand detection) is off by default: it would only add latency.
-#ifndef SMART_LAYER_SL_CHORDAL_HOLD
-#    define SMART_LAYER_SL_CHORDAL_HOLD 0
-#endif
-
-#ifndef SMART_LAYER_SL_FLOW_TAP
-#    ifdef FLOW_TAP_TERM
-#        define SMART_LAYER_SL_FLOW_TAP 1
-#    else
-#        define SMART_LAYER_SL_FLOW_TAP 0
-#    endif
-#endif
-
-#ifndef SMART_LAYER_SL_RETRO_TAPPING
-#    ifdef RETRO_TAPPING
-#        define SMART_LAYER_SL_RETRO_TAPPING 1
-#    else
-#        define SMART_LAYER_SL_RETRO_TAPPING 0
-#    endif
-#endif
-
-#ifndef SMART_LAYER_SL_QUICK_TAP
-#    define SMART_LAYER_SL_QUICK_TAP 1
-#endif
-
-// SL double-tap locks the layer.
+// Whether a double tap of an SL trigger locks the sticky layer. A locked layer
+// ignores both the idle timeout and the whitelist until it is tapped again.
 #ifndef SMART_LAYER_SL_DOUBLE_TAP_LOCK
 #    define SMART_LAYER_SL_DOUBLE_TAP_LOCK 1
 #endif
 
-// Whether the key that triggers an automatic exit is swallowed (not sent).
-#ifndef SMART_LAYER_SL_SWALLOW_EXIT
-#    define SMART_LAYER_SL_SWALLOW_EXIT 0
-#endif
-
-#ifndef SMART_LAYER_SLT_PERMISSIVE_HOLD
-#    if defined(PERMISSIVE_HOLD) || defined(PERMISSIVE_HOLD_PER_KEY)
-#        define SMART_LAYER_SLT_PERMISSIVE_HOLD 1
-#    else
-#        define SMART_LAYER_SLT_PERMISSIVE_HOLD 0
-#    endif
-#endif
-
-#ifndef SMART_LAYER_SLT_HOLD_ON_OTHER_KEY_PRESS
-#    if defined(HOLD_ON_OTHER_KEY_PRESS) || defined(HOLD_ON_OTHER_KEY_PRESS_PER_KEY)
-#        define SMART_LAYER_SLT_HOLD_ON_OTHER_KEY_PRESS 1
-#    else
-#        define SMART_LAYER_SLT_HOLD_ON_OTHER_KEY_PRESS 0
-#    endif
-#endif
-
-// SLT's tap is a character, so chordal hold follows the global setting.
-#ifndef SMART_LAYER_SLT_CHORDAL_HOLD
-#    ifdef CHORDAL_HOLD
-#        define SMART_LAYER_SLT_CHORDAL_HOLD 1
-#    else
-#        define SMART_LAYER_SLT_CHORDAL_HOLD 0
-#    endif
-#endif
-
-#ifndef SMART_LAYER_SLT_FLOW_TAP
-#    ifdef FLOW_TAP_TERM
-#        define SMART_LAYER_SLT_FLOW_TAP 1
-#    else
-#        define SMART_LAYER_SLT_FLOW_TAP 0
-#    endif
-#endif
-
-#ifndef SMART_LAYER_SLT_RETRO_TAPPING
-// Defaults off: retro tapping would turn the sticky layer off again when the
-// trigger is held and released on its own, defeating SLT's hold action. Set to
-// 1 to opt in.
-#    define SMART_LAYER_SLT_RETRO_TAPPING 0
-#endif
-
-#ifndef SMART_LAYER_SLT_QUICK_TAP
-#    define SMART_LAYER_SLT_QUICK_TAP 1
-#endif
-
-// Whether a double tap of SLT repeats the tap key (LT-style auto-repeat).
-// (SMART_LAYER_SLT_QUICK_TAP above is the same switch; kept for symmetry.)
-
-#ifndef SMART_LAYER_SLT_SWALLOW_EXIT
-#    define SMART_LAYER_SLT_SWALLOW_EXIT 0
-#endif
-
-// ---- Keycodes --------------------------------------------------------------
-
-// Requires QMK_KEYBOARD_H (which pulls in community_modules.h) to be included
-// first, so the SMART_LAYER_* enum constants are in scope.
-#define SLT(slot) ((uint16_t)(SMART_LAYER_SLT_0 + (slot)))
-#define SL(slot) ((uint16_t)(SMART_LAYER_SL_0 + (slot)))
-#define SL_OFF SMART_LAYER_OFF
-
-// ---- Configuration ---------------------------------------------------------
+typedef enum {
+    SMART_LAYER_NONE = 0,
+    SMART_LAYER_SL,  // tap activates a sticky layer, hold is native MO
+    SMART_LAYER_SLT, // tap is native kc, hold activates a sticky layer
+} smart_layer_mode_t;
 
 typedef struct {
-    uint8_t  layer;            // target layer (must be < MAX_LAYER)
-    uint16_t tap;              // SLT tap keycode; ignored by SL
-    uint16_t timeout;          // ms; 0 = disabled; SMART_LAYER_TIMEOUT_DEFAULT = use default
-    int8_t   lock_enable;      // -1 = default; else 0/1 (SL lock on double-tap)
-    int8_t   swallow_exit;     // -1 = default; else 0/1 (swallow the exit-triggering key)
-    uint8_t  continue_list_size;
-    const uint16_t *continue_list; // extra whitelist keycodes
-    bool     ignore_alphas;
-    bool     ignore_numbers;
-    bool     ignore_modifiers;
+    uint16_t        timeout;            // ms; 0 disables the timeout
+    bool            swallow_exit;       // swallow the key that exits the layer
+    const uint16_t *continue_list;      // extra keycodes that keep the layer on
+    uint8_t         continue_list_size;
 } smart_layer_config_t;
 
-// Define this in your keymap.c to configure the slots. A weak default table is
-// provided, where slot n targets layer n, with no tap key and the default
-// timeout. Setting .lock_enable / .swallow_exit to SMART_LAYER_USE_DEFAULT
-// defers to the compile-time switches above.
-extern const smart_layer_config_t smart_layer_configs[SMART_LAYER_SLOT_COUNT];
+// Override in keymap.c. `cfg` is pre-filled with the defaults above before the
+// call, so only change what you need. Return SMART_LAYER_NONE for non-triggers.
+smart_layer_mode_t smart_layer_get(uint16_t keycode, smart_layer_config_t *cfg);
+
+// Clears every sticky layer (also turns Caps Word off, if enabled).
+#define SL_OFF SMART_LAYER_OFF
