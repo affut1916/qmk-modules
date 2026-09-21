@@ -18,6 +18,7 @@ QMK 智能层（Smart Layer）社区模块。灵感与功能移植自 urob 的 Z
 - [安装](#安装)
 - [快速上手](#快速上手)
 - [SL 与 SLT 详解](#sl-与-slt-详解)
+- [作为 Combo 的输出](#作为-combo-的输出)
 - [层如何自动关闭](#层如何自动关闭)
 - [配置项](#配置项)
 - [注意事项与行为细则](#注意事项与行为细则)
@@ -108,7 +109,7 @@ smart_layer_mode_t smart_layer_get(uint16_t keycode, smart_layer_config_t *cfg) 
             return SMART_LAYER_SL;
 
         case SLT_TAB:
-            cfg->timeout = 500; // 覆盖默认的 300ms
+            cfg->timeout = 500; // 覆盖默认的 3000ms
             return SMART_LAYER_SLT;
     }
     return SMART_LAYER_NONE;
@@ -161,6 +162,25 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
 
 也就是说，**SL 把“粘滞”放在 tap 上，SLT 把“粘滞”放在 hold 上**，你可以按手感自由选择。
 
+### 作为 Combo 的输出
+
+触发键也可以放在 combo 的输出里：QMK 会把 combo 的 `keycode` 交给本模块，模块以 **keycode**（而非矩阵位置）识别触发键，因此**同一个 `LT(6, KC_NO)` 无论直接放键位还是由 combo 输出，都共用同一个粘滞层**，开启、关闭、auto-exit、timeout、白名单行为一致。
+
+```c
+#define SL_NUM LT(NUM, KC_NO)
+
+// 两个键同时按下输出 SL_NUM
+const uint16_t PROGMEM combo_num[] = {KC_J, KC_K, COMBO_END};
+combo_t key_combos[] = {
+    COMBO(combo_num, SL_NUM),
+};
+```
+
+- 直接键与 combo 输出的同一 LT 会合并为同一个粘滞层；同一个 LT 出现在多个位置时同理。
+- **combo 的组成键必须在目标层上保持透明**（`KC_TRANSPARENT`）。否则层开启后这些位置会解析成别的键、combo 不再匹配。例如上面的 `KC_J/K` 要在 `NUM` 层写成 `_______`。
+- combo 是 `COMBO_EVENT`，**不参与 auto-exit**（不会关闭其它粘滞层），但会正常计入“有键被按住”，按住时暂停 timeout。
+- 若在一次触发后、`QUICK_TAP_TERM` 窗口内再次触发同一个 combo，会被判定为双击而**锁定**该层。可用 `SMART_LAYER_SL_DOUBLE_TAP_LOCK 0` 关闭锁定。
+
 ---
 
 ## 层如何自动关闭
@@ -171,12 +191,13 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
    默认白名单规则：该键在你**目标层上对应位置有定义**（即不是 `KC_TRANSPARENT`），就算“属于该层”，层继续开着；否则关闭。
    例如 Num 层在 `BSPC` 的位置定义了 Backspace，那按 `BSPC` 不会关层；按一个 Num 层上没有的字母就会关层。
 
-2. **空闲超时到达**（默认 300ms，可逐键覆盖；设为 `0` 表示禁用）。
+2. **空闲超时到达**（默认 3000ms，可逐键覆盖；设为 `0` 表示禁用）。
    只要**当前有任意键被按住**，超时暂停，不会被截断。
 
 3. **按下 `SL_OFF`**：清除所有智能层（若启用了 Caps Word，一并关闭）。
 
 > 注意：combo、宏等**非物理按键事件**不会关闭智能层。
+> 但一个输出 LT 的 combo 仍然可以**开启/关闭**它自己的粘滞层（见下节）。
 
 ---
 
@@ -188,7 +209,7 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
 
 | 字段 | 默认 | 说明 |
 |---|---|---|
-| `timeout` | `SMART_LAYER_DEFAULT_TIMEOUT` (300) | 空闲超时，毫秒；`0` 禁用 |
+| `timeout` | `SMART_LAYER_DEFAULT_TIMEOUT` (3000) | 空闲超时，毫秒；`0` 禁用 |
 | `swallow_exit` | `SMART_LAYER_SWALLOW_EXIT` (0) | 触发自动退出的那个键是否被吞掉（不发送） |
 | `continue_list` | `NULL` | 额外白名单键码数组 |
 | `continue_list_size` | `0` | 上面数组的长度 |
@@ -223,7 +244,7 @@ case SL_NUM:
 | 宏 | 默认 | 说明 |
 |---|---|---|
 | `SMART_LAYER_MAX_ACTIVE` | `8` | 同时追踪的粘滞层数量上限（与 `MAX_LAYER` 无关） |
-| `SMART_LAYER_DEFAULT_TIMEOUT` | `300` | 默认空闲超时（毫秒） |
+| `SMART_LAYER_DEFAULT_TIMEOUT` | `3000` | 默认空闲超时（毫秒） |
 | `SMART_LAYER_SWALLOW_EXIT` | `0` | 默认是否吞掉退出触发键 |
 | `SMART_LAYER_SL_DOUBLE_TAP_LOCK` | `1` | 是否启用 SL 双击锁定 |
 
@@ -236,7 +257,7 @@ case SL_NUM:
 - **三种“层激活动作”不算普通按键**，所以不会关闭其它智能层：SL tap、SL hold、SLT hold。
 - **SLT 的 tap 算普通按键**（它真的发送了一个字符），因此**会**参与白名单、可能关闭其它智能层。这是符合直觉的行为。
 - 因为底层就是原生 `LT`，与 HRM（`CHORDAL_HOLD` 等）完全兼容，无需额外配置。
-- 触发键按**矩阵位置**追踪，因此层开启后也能正确识别“同一物理键”的再次按下。
+- 触发键按 **keycode** 追踪，因此层开启后仍能识别同一个 LT，直接键与 combo 输出也共用同一个粘滞层。
 
 ---
 
@@ -248,7 +269,7 @@ case SL_NUM:
   - 另一半返回 `true`，放行到 QMK 原生处理（SL 的 hold → `MO`；SLT 的 tap → 普通键）。
 - `housekeeping_task_smart_layer()`：检查空闲超时。
 - `layer_state_set_smart_layer()`：对仍处于粘滞状态的层重新置位，防止被外部 `MO`/`MT` 的松手误关。
-- 触发键以 `keypos_t`（矩阵位置）记录，保证层开启后仍能识别。
+- 触发键以 `keycode` 记录，保证层开启后仍能识别，并让物理键与 combo 输出共享同一粘滞层。
 
 ---
 
@@ -257,6 +278,7 @@ case SL_NUM:
 - **未经实机测试**。本模块由 AI 编写，尚待真实键盘验证；请在合入日常使用前充分测试。
 - 行为基于 QMK `master` 的社区模块 API（`ASSERT_COMMUNITY_MODULES_MIN_API_VERSION(1, 1, 0)`），较旧的 QMK 版本可能不兼容。
 - split 键盘、`swallow_exit` 与 combo 的组合等边界场景未经验证。
+- combo 输出的触发键若在 `QUICK_TAP_TERM` 窗口内被快速二次触发，会按双击锁定处理。
 
 ---
 
@@ -286,6 +308,7 @@ A QMK community module for **Smart Layers**. Inspired by and ported from urob's 
 - [Installation](#installation)
 - [Quick start](#quick-start)
 - [SL and SLT in detail](#sl-and-slt-in-detail)
+- [As a combo output](#as-a-combo-output)
 - [How a layer closes](#how-a-layer-closes)
 - [Configuration](#configuration)
 - [Notes and details](#notes-and-details)
@@ -376,7 +399,7 @@ smart_layer_mode_t smart_layer_get(uint16_t keycode, smart_layer_config_t *cfg) 
             return SMART_LAYER_SL;
 
         case SLT_TAB:
-            cfg->timeout = 500; // override the default 300 ms
+            cfg->timeout = 500; // override the default 3000 ms
             return SMART_LAYER_SLT;
     }
     return SMART_LAYER_NONE;
@@ -429,6 +452,25 @@ The tap/hold meanings are **complementary**:
 
 In short: **SL puts "sticky" on tap, SLT puts "sticky" on hold** — pick whichever feels right.
 
+### As a combo output
+
+A trigger may also be the output of a combo: QMK hands the combo's `keycode` to this module, which identifies triggers by **keycode** (not matrix position). So the **same `LT(6, KC_NO)`, whether placed directly or emitted by a combo, shares one sticky layer** with identical on/off, auto-exit, timeout, and whitelist behavior.
+
+```c
+#define SL_NUM LT(NUM, KC_NO)
+
+// Two keys pressed together emit SL_NUM
+const uint16_t PROGMEM combo_num[] = {KC_J, KC_K, COMBO_END};
+combo_t key_combos[] = {
+    COMBO(combo_num, SL_NUM),
+};
+```
+
+- A directly-placed key and a combo output of the same LT merge into one sticky layer; an LT appearing in multiple places likewise.
+- **The combo's member keys must stay transparent** (`KC_TRANSPARENT`) on the target layer. Otherwise, once the layer is on, those positions resolve to other keycodes and the combo no longer matches. In the example above, `KC_J`/`KC_K` must be `_______` on the `NUM` layer.
+- A combo is a `COMBO_EVENT`, so it **never participates in auto-exit** (it will not close other sticky layers), but it does count as a held key, suspending the timeout while held.
+- If the same combo is triggered again within `QUICK_TAP_TERM` of a trigger, it is treated as a double tap and **locks** the layer. Disable locking with `SMART_LAYER_SL_DOUBLE_TAP_LOCK 0`.
+
 ---
 
 ## How a layer closes
@@ -439,12 +481,13 @@ A sticky layer closes when any of these happens:
    Default whitelist: if the key has a definition (not `KC_TRANSPARENT`) at that position on the target layer, it belongs to the layer and the layer stays on; otherwise it closes.
    E.g. if the Num layer defines Backspace at the `BSPC` position, pressing `BSPC` keeps the layer on; pressing a letter not on the Num layer closes it.
 
-2. **The idle timeout elapses** (default 300 ms, per-key overridable; `0` disables it).
-   While **any key is physically held**, the timeout is suspended, so a long keypress never cuts the layer short.
+2. **The idle timeout elapses** (default 3000 ms, per-key overridable; `0` disables it).
+   While **any key is held**, the timeout is suspended, so a long keypress never cuts the layer short.
 
 3. **`SL_OFF` is pressed**: clears every smart layer (also turns Caps Word off, if enabled).
 
 > Note: non-physical events such as combos and macros never close a smart layer.
+> A combo that *emits* an LT can still turn its own sticky layer on/off (see above).
 
 ---
 
@@ -456,7 +499,7 @@ When `smart_layer_get()` is called, `cfg` is pre-filled with these defaults:
 
 | Field | Default | Description |
 |---|---|---|
-| `timeout` | `SMART_LAYER_DEFAULT_TIMEOUT` (300) | idle timeout in ms; `0` disables |
+| `timeout` | `SMART_LAYER_DEFAULT_TIMEOUT` (3000) | idle timeout in ms; `0` disables |
 | `swallow_exit` | `SMART_LAYER_SWALLOW_EXIT` (0) | whether the auto-exit key is swallowed (not sent) |
 | `continue_list` | `NULL` | extra whitelist keycodes |
 | `continue_list_size` | `0` | length of the array above |
@@ -491,7 +534,7 @@ Override in your `config.h`:
 | Macro | Default | Description |
 |---|---|---|
 | `SMART_LAYER_MAX_ACTIVE` | `8` | max tracked sticky layers (unrelated to `MAX_LAYER`) |
-| `SMART_LAYER_DEFAULT_TIMEOUT` | `300` | default idle timeout (ms) |
+| `SMART_LAYER_DEFAULT_TIMEOUT` | `3000` | default idle timeout (ms) |
 | `SMART_LAYER_SWALLOW_EXIT` | `0` | default for swallowing the exit key |
 | `SMART_LAYER_SL_DOUBLE_TAP_LOCK` | `1` | enable SL double-tap lock |
 
@@ -504,7 +547,7 @@ Override in your `config.h`:
 - **The three layer-activation halves are not ordinary presses**, so they do not close other smart layers: SL tap, SL hold, SLT hold.
 - **An SLT tap is an ordinary key** (it really sends a character), so it **does** participate in the whitelist and may close other smart layers. That is the intuitive behavior.
 - Because it builds on native `LT`, it is fully compatible with HRM (`CHORDAL_HOLD`, etc.) with no extra configuration.
-- Triggers are tracked by **matrix position**, so the same physical key is recognized again after the layer is on.
+- Triggers are tracked by **keycode**, so the same LT stays identifiable once the layer is on, and a direct key and a combo output share one sticky layer.
 
 ---
 
@@ -516,7 +559,7 @@ Override in your `config.h`:
   - returns `true` for the other half, letting QMK handle it natively (SL hold → `MO`; SLT tap → normal key).
 - `housekeeping_task_smart_layer()`: checks the idle timeout.
 - `layer_state_set_smart_layer()`: re-asserts still-sticky layers so an external `MO`/`MT` release cannot mistakenly turn them off.
-- Triggers are stored as `keypos_t` (matrix position) so they remain identifiable once the layer is on.
+- Triggers are stored as a `keycode` so they remain identifiable once the layer is on, and a physical key and a combo output share one sticky layer.
 
 ---
 
@@ -525,6 +568,7 @@ Override in your `config.h`:
 - **Not tested on hardware.** This module is AI-authored and awaits validation on a real keyboard; test thoroughly before daily use.
 - Targets QMK `master`'s community-module API (`ASSERT_COMMUNITY_MODULES_MIN_API_VERSION(1, 1, 0)`); older QMK may be incompatible.
 - Edge cases such as split keyboards and `swallow_exit` combined with combos are unverified.
+- A combo output trigger rapidly re-triggered within `QUICK_TAP_TERM` is treated as a double tap and locks the layer.
 
 ---
 

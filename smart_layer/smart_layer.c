@@ -9,6 +9,11 @@
 //
 //   SL  = LT(layer, KC_NO)   tap  -> sticky layer, hold -> native MO
 //   SLT = LT(layer, kc)      tap  -> native kc,    hold -> sticky layer
+//
+// Triggers are identified by keycode, not by matrix position. A combo that
+// emits an LT produces a COMBO_EVENT with key == (0,0); matching on keycode
+// lets the same LT reliably toggle its sticky layer whether it is a physical
+// key or a combo output (and the two share one sticky layer).
 
 #include QMK_KEYBOARD_H
 
@@ -23,12 +28,12 @@ ASSERT_COMMUNITY_MODULES_MIN_API_VERSION(1, 1, 0);
 
 typedef struct {
     bool            active;
-    bool            locked;        // ignores timeout and the whitelist
+    bool            locked;           // ignores timeout and the whitelist
     uint8_t         layer;
-    keypos_t        trigger_pos;   // physical position of the trigger
-    uint16_t        timeout;       // ms; 0 disables the idle timeout
-    uint16_t        tap_time;      // time of the last tap, for SL double-tap
-    uint16_t        last_activity; // for the idle timeout
+    uint16_t        trigger_keycode;  // the LT keycode that opened the layer
+    uint16_t        timeout;          // ms; 0 disables the idle timeout
+    uint16_t        tap_time;         // time of the last tap, for SL double-tap
+    uint16_t        last_activity;    // for the idle timeout
     bool            swallow_exit;
     const uint16_t *continue_list;
     uint8_t         continue_list_size;
@@ -36,8 +41,9 @@ typedef struct {
 
 static smart_active_t active[SMART_LAYER_MAX_ACTIVE];
 
-// Number of physical keys currently held; while nonzero the idle timeout is
-// suspended so that a long keypress never cuts a sticky layer short.
+// Number of keys currently held (physical keys and combo outputs); while
+// nonzero the idle timeout is suspended so that a long press never cuts a
+// sticky layer short.
 static uint16_t held_key_count = 0;
 
 // A key that triggered an automatic exit and is being swallowed.
@@ -46,12 +52,12 @@ static keypos_t swallowed_key  = {0};
 
 // ---- Helpers ---------------------------------------------------------------
 
-// Matches an active trigger by its physical key position. Position (rather
-// than keycode) is used so it keeps working after the layer is on and the
-// position may resolve to a different keycode.
-static smart_active_t *find_by_pos(keypos_t pos) {
+// Matches an active trigger by its keycode. Keycode (rather than matrix
+// position) is used so the same LT keeps working whether it comes from a
+// physical key or a combo output, whose event.key is always (0,0).
+static smart_active_t *find_by_keycode(uint16_t keycode) {
     for (uint8_t i = 0; i < SMART_LAYER_MAX_ACTIVE; i++) {
-        if (active[i].active && KEYEQ(active[i].trigger_pos, pos)) {
+        if (active[i].active && active[i].trigger_keycode == keycode) {
             return &active[i];
         }
     }
@@ -138,7 +144,7 @@ static smart_layer_mode_t get_config(uint16_t keycode, smart_layer_config_t *cfg
 
 // Creates a sticky layer for `keycode`. Returns NULL if the layer is invalid or
 // no slot is free.
-static smart_active_t *activate(uint16_t keycode, keypos_t pos, const smart_layer_config_t *cfg) {
+static smart_active_t *activate(uint16_t keycode, const smart_layer_config_t *cfg) {
     const uint8_t layer = QK_LAYER_TAP_GET_LAYER(keycode);
     if (layer >= MAX_LAYER) {
         return NULL;
@@ -151,7 +157,7 @@ static smart_active_t *activate(uint16_t keycode, keypos_t pos, const smart_laye
         .active             = true,
         .locked             = false,
         .layer              = layer,
-        .trigger_pos        = pos,
+        .trigger_keycode    = keycode,
         .timeout            = cfg->timeout,
         .tap_time           = timer_read(),
         .last_activity      = timer_read(),
@@ -170,9 +176,9 @@ static void sl_tap(uint16_t keycode, keyrecord_t *record) {
     smart_layer_config_t cfg;
     (void)get_config(keycode, &cfg);
 
-    smart_active_t *slot = find_by_pos(record->event.key);
+    smart_active_t *slot = find_by_keycode(keycode);
     if (slot == NULL) {
-        activate(keycode, record->event.key, &cfg);
+        activate(keycode, &cfg);
         return;
     }
     if (slot->locked) {
@@ -188,15 +194,15 @@ static void sl_tap(uint16_t keycode, keyrecord_t *record) {
 }
 
 // SLT hold (tap.count == 0 on press): activate, or close if already active.
-static void slt_hold(uint16_t keycode, keyrecord_t *record) {
-    smart_active_t *slot = find_by_pos(record->event.key);
+static void slt_hold(uint16_t keycode) {
+    smart_active_t *slot = find_by_keycode(keycode);
     if (slot != NULL) {
         deactivate(slot); // Repeat hold closes it.
         return;
     }
     smart_layer_config_t cfg;
     (void)get_config(keycode, &cfg);
-    activate(keycode, record->event.key, &cfg);
+    activate(keycode, &cfg);
 }
 
 // ---- Auto-exit -------------------------------------------------------------
@@ -216,7 +222,7 @@ static bool check_auto_exit(uint16_t keycode, keyrecord_t *record) {
             continue;
         }
         // A trigger never exits the layer it belongs to.
-        if (KEYEQ(slot->trigger_pos, record->event.key)) {
+        if (keycode == slot->trigger_keycode) {
             slot->last_activity = timer_read();
             continue;
         }
@@ -262,7 +268,9 @@ bool process_record_smart_layer(uint16_t keycode, keyrecord_t *record) {
         return false;
     }
 
-    if (IS_KEYEVENT(record->event)) {
+    // Physical keys and combo outputs both count as held, so a long keypress
+    // (or a held combo) suspends the idle timeout.
+    if (IS_KEYEVENT(record->event) || IS_COMBOEVENT(record->event)) {
         if (pressed) {
             held_key_count++;
         } else {
@@ -291,10 +299,10 @@ bool process_record_smart_layer(uint16_t keycode, keyrecord_t *record) {
         } else if (mode == SMART_LAYER_SLT) {
             if (record->tap.count == 0) {
                 if (pressed) {
-                    slt_hold(keycode, record);
+                    slt_hold(keycode);
                 } else {
                     // Start the idle timeout from the trigger's release.
-                    smart_active_t *slot = find_by_pos(record->event.key);
+                    smart_active_t *slot = find_by_keycode(keycode);
                     if (slot != NULL) {
                         slot->last_activity = timer_read();
                         slot->tap_time      = timer_read();

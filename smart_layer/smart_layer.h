@@ -32,9 +32,16 @@
 // non-transparent keycode at that position. Add extra keycodes with
 // smart_layer_config_t.continue_list.
 //
+// Triggers are tracked by keycode, so the same LT may be placed on a physical
+// key and/or emitted by a combo, and either one toggles the same sticky layer.
+// A combo output is a COMBO_EVENT with no matrix position; it still toggles the
+// layer, but it is not an ordinary press and never takes part in auto-exit.
+//
 // IMPORTANT: leave each trigger's own position transparent on the layer it
 // activates, so the trigger keeps resolving to the same LT key and can be
-// toggled off / re-held.
+// toggled off / re-held. This also applies to the keys making up a combo that
+// outputs a trigger: if they are not transparent on the target layer, the combo
+// stops matching once the layer is on.
 //
 // Declare your triggers from keymap.c:
 //

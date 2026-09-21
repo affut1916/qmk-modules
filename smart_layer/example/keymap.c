@@ -30,7 +30,7 @@ smart_layer_mode_t smart_layer_get(uint16_t keycode, smart_layer_config_t *cfg) 
             return SMART_LAYER_SL; // Double-tap lock is controlled by
                                    // SMART_LAYER_SL_DOUBLE_TAP_LOCK (default on).
         case SLT_TAB:
-            cfg->timeout = 500; // Override the default 300 ms.
+            cfg->timeout = 500; // Override the default 3000 ms.
             return SMART_LAYER_SLT;
     }
     return SMART_LAYER_NONE;
@@ -58,3 +58,14 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
     ),
 };
 // clang-format on
+
+// Optional: the very same SL_NUM can also be emitted by a combo. The module
+// identifies triggers by keycode, so the physical key and this combo share one
+// sticky layer. The combo members (KC_Q/KC_W) stay transparent on the NUM layer
+// (see the keymap above). Requires COMBO_ENABLE in your config.
+#ifdef COMBO_ENABLE
+const uint16_t PROGMEM combo_num[] = {KC_Q, KC_W, COMBO_END};
+combo_t key_combos[] = {
+    COMBO(combo_num, SL_NUM),
+};
+#endif
