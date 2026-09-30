@@ -13,7 +13,7 @@
 | 模块 | 说明 |
 |---|---|
 | [`smart_layer`](smart_layer/) | 智能层。tap/hold 判定完全复用 QMK 原生 `LT`，点一下即可“粘住”一个层，并在按下非白名单键、超时或清除键时自动关闭。移植自 [urob 的 ZMK 实现](https://github.com/urob/zmk-auto-layer)。 |
-| [`smart_modifier`](smart_modifier/) | 智能 Modifier。一个更聪明的 One Shot Modifier：消费键抬起后，mod 还会继续有效一小段时间（滚动窗口），让一串快速按键都带上修饰键。tap/hold 判定复用原生 `OSM`。 |
+| [`smart_osm`](smart_osm/) | 智能 OSM。一个更聪明的 One Shot Modifier：消费键抬起后，mod 还会继续有效一小段时间（滚动窗口），让一串快速按键都带上修饰键。tap/hold 判定复用原生 `OSM`。 |
 
 ## 安装
 
@@ -86,7 +86,7 @@ modules/affut1916/smart_layer/qmk_module.json
 各模块的配置项与键码请查看对应模块的 README：
 
 - [`smart_layer/README.md`](smart_layer/README.md)
-- [`smart_modifier/README.md`](smart_modifier/README.md)
+- [`smart_osm/README.md`](smart_osm/README.md)
 
 ## 目录结构
 
@@ -102,11 +102,11 @@ qmk-modules/
 │   ├── smart_layer.c     # 实现
 │   ├── example/keymap.c  # 用法示例
 │   └── README.md         # 双语文档
-└── smart_modifier/
+└── smart_osm/
     ├── qmk_module.json   # 模块元数据
     ├── config.h          # 空；选项经 #ifndef 暴露在头文件
-    ├── smart_modifier.h  # 公共 API 与配置项
-    ├── smart_modifier.c  # 实现
+    ├── smart_osm.h       # 公共 API 与配置项
+    ├── smart_osm.c       # 实现
     ├── example/keymap.c  # 用法示例
     └── README.md         # 双语文档
 ```
@@ -125,11 +125,11 @@ qmk_firmware/
         │   ├── smart_layer.c
         │   ├── example/keymap.c
         │   └── README.md
-        └── smart_modifier/
+        └── smart_osm/
             ├── qmk_module.json
             ├── config.h
-            ├── smart_modifier.h
-            ├── smart_modifier.c
+            ├── smart_osm.h
+            ├── smart_osm.c
             ├── example/keymap.c
             └── README.md
 ```
@@ -165,7 +165,7 @@ Each module is self-contained and can be dropped into your QMK userspace or firm
 | Module | Description |
 |---|---|
 | [`smart_layer`](smart_layer/) | Smart Layers. The tap/hold decision is delegated to QMK's native `LT`; tap once to "stick" a layer on, and it auto-closes on a non-whitelisted key, a timeout, or a clear key. Ported from [urob's ZMK work](https://github.com/urob/zmk-auto-layer). |
-| [`smart_modifier`](smart_modifier/) | Smart Modifier. A smarter One Shot Modifier: after the consuming key is released the mod lingers for a short rolling window, so a fast burst of keys all gets the modifier. The tap/hold decision is delegated to native `OSM`. |
+| [`smart_osm`](smart_osm/) | Smart OSM. A smarter One Shot Modifier: after the consuming key is released the mod lingers for a short rolling window, so a fast burst of keys all gets the modifier. The tap/hold decision is delegated to native `OSM`. |
 
 ## Installation
 
@@ -238,7 +238,7 @@ modules/affut1916/smart_layer/qmk_module.json
 See each module's README for options and keycodes:
 
 - [`smart_layer/README.md`](smart_layer/README.md)
-- [`smart_modifier/README.md`](smart_modifier/README.md)
+- [`smart_osm/README.md`](smart_osm/README.md)
 
 ## Layout
 
@@ -254,11 +254,11 @@ qmk-modules/
 │   ├── smart_layer.c     # implementation
 │   ├── example/keymap.c  # usage example
 │   └── README.md         # bilingual docs
-└── smart_modifier/
+└── smart_osm/
     ├── qmk_module.json   # module metadata
     ├── config.h          # empty; options are exposed via #ifndef in the header
-    ├── smart_modifier.h  # public API and options
-    ├── smart_modifier.c  # implementation
+    ├── smart_osm.h       # public API and options
+    ├── smart_osm.c       # implementation
     ├── example/keymap.c  # usage example
     └── README.md         # bilingual docs
 ```
@@ -277,11 +277,11 @@ qmk_firmware/
         │   ├── smart_layer.c
         │   ├── example/keymap.c
         │   └── README.md
-        └── smart_modifier/
+        └── smart_osm/
             ├── qmk_module.json
             ├── config.h
-            ├── smart_modifier.h
-            ├── smart_modifier.c
+            ├── smart_osm.h
+            ├── smart_osm.c
             ├── example/keymap.c
             └── README.md
 ```

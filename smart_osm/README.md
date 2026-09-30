@@ -1,8 +1,8 @@
-# smart_modifier
+# smart_osm
 
 > 中文 | [English](#english)
 
-QMK「智能 Modifier」社区模块：一个更聪明的 One Shot Modifier（OSM）。
+QMK「智能 OSM」社区模块：一个更聪明的 One Shot Modifier（OSM）。
 
 > **免责声明**：本模块完全由 AI 生成，未经实机编译与测试，代码质量不作任何保证。使用前请自行审阅源码，并自行承担风险。
 
@@ -20,12 +20,12 @@ QMK「智能 Modifier」社区模块：一个更聪明的 One Shot Modifier（OS
 
 ## 行为
 
-只对回调里声明为 `SMART_MODIFIER_OSM` 的 OSM 键生效，其它 OSM 键完全保持原生。
+只对回调里声明为 `SMART_OSM_OSM` 的 OSM 键生效，其它 OSM 键完全保持原生。
 
 | 操作 | 效果 |
 |---|---|
 | **tap** | 让 mod 进入排队；下一个普通键带上它，并在该键（及之后每个键）抬起后继续有效 `timeout` 毫秒 |
-| **双击** | 锁定 mod（`SMART_MODIFIER_LOCK`，默认开）。锁定后忽略超时，再 tap 一次解锁 |
+| **双击** | 锁定 mod（`SMART_OSM_LOCK`，默认开）。锁定后忽略超时，再 tap 一次解锁 |
 | **再次 tap** | 取消该 mod（非双击时） |
 | **按住** | 原生 OSM：按住期间是真实修饰键，松手即撤 |
 
@@ -36,8 +36,8 @@ QMK「智能 Modifier」社区模块：一个更聪明的 One Shot Modifier（OS
 
 ### 超时
 
-- **滞留超时** `SMART_MODIFIER_TIMEOUT`（默认 250ms）：消费键抬起后 mod 继续有效的时长。
-- **排队超时** `SMART_MODIFIER_QUEUE_TIMEOUT`（默认 0，即不超时）：tap 之后到第一个普通键之间的等待上限。
+- **滞留超时** `SMART_OSM_TIMEOUT`（默认 250ms）：消费键抬起后 mod 继续有效的时长。
+- **排队超时** `SMART_OSM_QUEUE_TIMEOUT`（默认 0，即不超时）：tap 之后到第一个普通键之间的等待上限。
 
 两者都可在回调里逐键覆盖。
 
@@ -47,13 +47,13 @@ QMK「智能 Modifier」社区模块：一个更聪明的 One Shot Modifier（OS
 
 ### 1. 放置模块
 
-把 `smart_modifier/` 放到 QMK userspace 或 firmware 的 `modules/affut1916` 目录下。
+把 `smart_osm/` 放到 QMK userspace 或 firmware 的 `modules/affut1916` 目录下。
 
 ### 2. 在 keymap.json 中启用
 
 ```json
 {
-    "modules": ["affut1916/smart_modifier"]
+    "modules": ["affut1916/smart_osm"]
 }
 ```
 
@@ -63,20 +63,20 @@ QMK「智能 Modifier」社区模块：一个更聪明的 One Shot Modifier（OS
 
 ```c
 #include QMK_KEYBOARD_H
-#include "smart_modifier.h"
+#include "smart_osm.h"
 
-smart_modifier_mode_t smart_modifier_get(uint16_t keycode, smart_modifier_config_t *cfg) {
+smart_osm_mode_t smart_osm_get(uint16_t keycode, smart_osm_config_t *cfg) {
     // 进入回调时 cfg 已填好默认值，只改你需要改的。
     switch (keycode) {
         case OSM(MOD_LSFT):
-            return SMART_MODIFIER_OSM;
+            return SMART_OSM_OSM;
 
         case OSM(MOD_LCTL):
             cfg->timeout       = 500;  // 覆盖默认 250ms
             cfg->queue_timeout = 1000; // 1 秒内没有键按下就放弃
-            return SMART_MODIFIER_OSM;
+            return SMART_OSM_OSM;
     }
-    return SMART_MODIFIER_NONE; // 其它 OSM 保持原生
+    return SMART_OSM_NONE; // 其它 OSM 保持原生
 }
 ```
 
@@ -97,22 +97,22 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
 
 ## 配置
 
-### 回调中的 `smart_modifier_config_t`
+### 回调中的 `smart_osm_config_t`
 
-进入 `smart_modifier_get()` 时 `cfg` 已填入下列默认值：
+进入 `smart_osm_get()` 时 `cfg` 已填入下列默认值：
 
 | 字段 | 默认 | 说明 |
 |---|---|---|
-| `timeout` | `SMART_MODIFIER_TIMEOUT` (250) | 滞留超时，毫秒；`0` = 不超时 |
-| `queue_timeout` | `SMART_MODIFIER_QUEUE_TIMEOUT` (0) | 排队超时，毫秒；`0` = 不超时 |
+| `timeout` | `SMART_OSM_TIMEOUT` (250) | 滞留超时，毫秒；`0` = 不超时 |
+| `queue_timeout` | `SMART_OSM_QUEUE_TIMEOUT` (0) | 排队超时，毫秒；`0` = 不超时 |
 
 ### config.h 全局宏
 
 | 宏 | 默认 | 说明 |
 |---|---|---|
-| `SMART_MODIFIER_TIMEOUT` | `250` | 默认滞留超时（毫秒） |
-| `SMART_MODIFIER_QUEUE_TIMEOUT` | `0` | 默认排队超时（毫秒）；`0` = 不超时 |
-| `SMART_MODIFIER_LOCK` | `1` | 是否启用双击锁定 |
+| `SMART_OSM_TIMEOUT` | `250` | 默认滞留超时（毫秒） |
+| `SMART_OSM_QUEUE_TIMEOUT` | `0` | 默认排队超时（毫秒）；`0` = 不超时 |
+| `SMART_OSM_LOCK` | `1` | 是否启用双击锁定 |
 
 ---
 
@@ -121,7 +121,7 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
 - 触发键就是普通 `OSM(mod)`；`record->tap.count` 区分 tap/hold，模块**只接管 tap 半区**，hold 半区返回 `true` 交给原生 OSM（真实 mod）。
 - mod 以 **weak mods** 应用：`action_exec()` 每次按下会清空 weak mods，所以模块在每次按下时重新 `add_weak_mods`，保证 mod 和消费键在同一份 HID report。
 - 双击判定用 `GET_QUICK_TAP_TERM()`，与普通 tap-hold 键的 quick tap 一致。
-- `housekeeping_task_smart_modifier()` 检查排队超时与滞留超时。
+- `housekeeping_task_smart_osm()` 检查排队超时与滞留超时。
 
 ---
 
@@ -143,7 +143,7 @@ GPL-2.0-or-later。
 
 <a name="english"></a>
 
-# smart_modifier (English)
+# smart_osm (English)
 
 A QMK community module: a **smarter One Shot Modifier**.
 
@@ -163,12 +163,12 @@ This module lets the mod **linger a little longer**: after the consuming key is 
 
 ## Behaviour
 
-Only OSM keys the callback declares as `SMART_MODIFIER_OSM` are affected; every other OSM key keeps native behaviour.
+Only OSM keys the callback declares as `SMART_OSM_OSM` are affected; every other OSM key keeps native behaviour.
 
 | Action | Effect |
 |---|---|
 | **tap** | arm the mod; the next ordinary key gets it, and it stays active for `timeout` ms after that key (and every further key) is released |
-| **double tap** | lock the mod (`SMART_MODIFIER_LOCK`, on by default). A locked mod ignores the timeout; tap once more to unlock |
+| **double tap** | lock the mod (`SMART_OSM_LOCK`, on by default). A locked mod ignores the timeout; tap once more to unlock |
 | **tap again** | cancel the mod (when it is not a double tap) |
 | **hold** | native OSM: a real modifier while held, released when let go |
 
@@ -179,8 +179,8 @@ Only OSM keys the callback declares as `SMART_MODIFIER_OSM` are affected; every 
 
 ### Timeouts
 
-- **Linger timeout** `SMART_MODIFIER_TIMEOUT` (default 250 ms): how long the mod stays active after the consuming key is released.
-- **Queue timeout** `SMART_MODIFIER_QUEUE_TIMEOUT` (default 0, i.e. no timeout): how long an armed mod waits for its first ordinary key.
+- **Linger timeout** `SMART_OSM_TIMEOUT` (default 250 ms): how long the mod stays active after the consuming key is released.
+- **Queue timeout** `SMART_OSM_QUEUE_TIMEOUT` (default 0, i.e. no timeout): how long an armed mod waits for its first ordinary key.
 
 Both can be overridden per key in the callback.
 
@@ -190,13 +190,13 @@ Both can be overridden per key in the callback.
 
 ### 1. Place the module
 
-Put `smart_modifier/` under the `modules/affut1916` directory of your QMK userspace or firmware.
+Put `smart_osm/` under the `modules/affut1916` directory of your QMK userspace or firmware.
 
 ### 2. Enable it in keymap.json
 
 ```json
 {
-    "modules": ["affut1916/smart_modifier"]
+    "modules": ["affut1916/smart_osm"]
 }
 ```
 
@@ -206,20 +206,20 @@ Put `smart_modifier/` under the `modules/affut1916` directory of your QMK usersp
 
 ```c
 #include QMK_KEYBOARD_H
-#include "smart_modifier.h"
+#include "smart_osm.h"
 
-smart_modifier_mode_t smart_modifier_get(uint16_t keycode, smart_modifier_config_t *cfg) {
+smart_osm_mode_t smart_osm_get(uint16_t keycode, smart_osm_config_t *cfg) {
     // `cfg` is pre-filled with the defaults; only change what you need.
     switch (keycode) {
         case OSM(MOD_LSFT):
-            return SMART_MODIFIER_OSM;
+            return SMART_OSM_OSM;
 
         case OSM(MOD_LCTL):
             cfg->timeout       = 500;  // override the default 250 ms
             cfg->queue_timeout = 1000; // give up if no key follows within 1 s
-            return SMART_MODIFIER_OSM;
+            return SMART_OSM_OSM;
     }
-    return SMART_MODIFIER_NONE; // other OSM keys stay native
+    return SMART_OSM_NONE; // other OSM keys stay native
 }
 ```
 
@@ -240,22 +240,22 @@ See [`example/keymap.c`](example/keymap.c) for a full example.
 
 ## Configuration
 
-### `smart_modifier_config_t` in the callback
+### `smart_osm_config_t` in the callback
 
-When `smart_modifier_get()` is called, `cfg` is pre-filled with these defaults:
+When `smart_osm_get()` is called, `cfg` is pre-filled with these defaults:
 
 | Field | Default | Description |
 |---|---|---|
-| `timeout` | `SMART_MODIFIER_TIMEOUT` (250) | linger timeout in ms; `0` disables |
-| `queue_timeout` | `SMART_MODIFIER_QUEUE_TIMEOUT` (0) | queue timeout in ms; `0` disables |
+| `timeout` | `SMART_OSM_TIMEOUT` (250) | linger timeout in ms; `0` disables |
+| `queue_timeout` | `SMART_OSM_QUEUE_TIMEOUT` (0) | queue timeout in ms; `0` disables |
 
 ### config.h globals
 
 | Macro | Default | Description |
 |---|---|---|
-| `SMART_MODIFIER_TIMEOUT` | `250` | default linger timeout (ms) |
-| `SMART_MODIFIER_QUEUE_TIMEOUT` | `0` | default queue timeout (ms); `0` disables |
-| `SMART_MODIFIER_LOCK` | `1` | enable the double-tap lock |
+| `SMART_OSM_TIMEOUT` | `250` | default linger timeout (ms) |
+| `SMART_OSM_QUEUE_TIMEOUT` | `0` | default queue timeout (ms); `0` disables |
+| `SMART_OSM_LOCK` | `1` | enable the double-tap lock |
 
 ---
 
@@ -264,7 +264,7 @@ When `smart_modifier_get()` is called, `cfg` is pre-filled with these defaults:
 - Triggers are ordinary `OSM(mod)` keys; `record->tap.count` tells tap from hold, and the module **claims only the tap half**, returning `true` for the hold half so native OSM handles it (a real mod).
 - The mod is applied as **weak mods**: `action_exec()` clears weak mods on every press, so the module re-applies `add_weak_mods` on each press, keeping the mod and the consuming key in the same HID report.
 - The double-tap window uses `GET_QUICK_TAP_TERM()`, matching a regular tap-hold key.
-- `housekeeping_task_smart_modifier()` checks the queue and linger timeouts.
+- `housekeeping_task_smart_osm()` checks the queue and linger timeouts.
 
 ---
 

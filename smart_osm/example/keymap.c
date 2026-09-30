@@ -1,7 +1,7 @@
 // Copyright 2026 affut1916
 // SPDX-License-Identifier: GPL-2.0-or-later
 //
-// Minimal example showing how to use the Smart Modifier module. This is a
+// Minimal example showing how to use the Smart OSM module. This is a
 // template: adapt the LAYOUT(...) call and matrix size to your board.
 //
 // Triggers are ordinary OSM keys; only the ones the callback opts in get the
@@ -13,20 +13,20 @@
 
 #include QMK_KEYBOARD_H
 
-#include "smart_modifier.h"
+#include "smart_osm.h"
 
-smart_modifier_mode_t smart_modifier_get(uint16_t keycode, smart_modifier_config_t *cfg) {
+smart_osm_mode_t smart_osm_get(uint16_t keycode, smart_osm_config_t *cfg) {
     // `cfg` arrives pre-filled with the defaults; override as needed.
     switch (keycode) {
         case OSM(MOD_LSFT):
-            return SMART_MODIFIER_OSM;
+            return SMART_OSM_OSM;
 
         case OSM(MOD_LCTL):
             cfg->timeout       = 500; // Override the default 250 ms.
             cfg->queue_timeout = 1000; // Give up if no key follows within 1 s.
-            return SMART_MODIFIER_OSM;
+            return SMART_OSM_OSM;
     }
-    return SMART_MODIFIER_NONE;
+    return SMART_OSM_NONE;
 }
 
 // clang-format off
