@@ -41,7 +41,7 @@
 //                                  smart_osm_config_t *cfg) {
 //     switch (keycode) {   // `cfg` is pre-filled; only change what you need.
 //       case OSM(MOD_LSFT): return SMART_OSM_OSM;
-//       case OSM(MOD_LCTL): cfg->timeout = 500; return SMART_OSM_OSM;
+//       case OSM(MOD_LCTL): cfg->timeout = 300; return SMART_OSM_OSM;
 //     }
 //     return SMART_OSM_NONE;
 //   }
@@ -58,7 +58,7 @@
 // milliseconds. 0 disables the lingering timeout (the mod stays until it is
 // cancelled or another trigger replaces it).
 #ifndef SMART_OSM_TIMEOUT
-#    define SMART_OSM_TIMEOUT 250
+#    define SMART_OSM_TIMEOUT 300
 #endif
 
 // How long an armed mod waits for its first ordinary key. 0 means it waits
