@@ -11,11 +11,17 @@
 //
 // Two trigger flavours, both plain LT keys:
 //
-//   SL  = LT(layer, KC_NO)   tap  = activate a sticky layer (toggle/lock)
+//   SL  = LT(layer, KC_NO)   tap  = activate a sticky layer (toggle/lock/extend)
 //                            hold = native MO(layer)
 //
 //   SLT = LT(layer, kc)      tap  = native kc (including native quick-tap)
-//                            hold = activate a sticky layer
+//                            hold = activate a sticky layer (toggle/extend)
+//
+// Re-triggering a trigger whose layer is already on normally turns that layer
+// off. Set SMART_LAYER_RETRIGGER_EXTENDS (or cfg->retrigger_extends per key)
+// to keep it on and restart its idle timeout instead, as if the trigger were a
+// whitelisted key. A double tap within the quick-tap window still locks the
+// layer, and a locked layer is still turned off by tapping its trigger.
 //
 // A sticky layer stays on until one of:
 //   * a key press that is not "part of" the layer (see the whitelist below),
@@ -33,15 +39,15 @@
 // smart_layer_config_t.continue_list.
 //
 // Triggers are tracked by keycode, so the same LT may be placed on a physical
-// key and/or emitted by a combo, and either one toggles the same sticky layer.
+// key and/or emitted by a combo, and either one drives the same sticky layer.
 // A combo output is a COMBO_EVENT with no matrix position; it still toggles the
 // layer, but it is not an ordinary press and never takes part in auto-exit.
 //
 // IMPORTANT: leave each trigger's own position transparent on the layer it
 // activates, so the trigger keeps resolving to the same LT key and can be
-// toggled off / re-held. This also applies to the keys making up a combo that
-// outputs a trigger: if they are not transparent on the target layer, the combo
-// stops matching once the layer is on.
+// toggled off / re-held / extended. This also applies to the keys making up a
+// combo that outputs a trigger: if they are not transparent on the target
+// layer, the combo stops matching once the layer is on.
 //
 // Declare your triggers from keymap.c:
 //
@@ -51,7 +57,7 @@
 //   smart_layer_mode_t smart_layer_get(uint16_t keycode,
 //                                      smart_layer_config_t *cfg) {
 //     switch (keycode) {   // `cfg` is pre-filled; only change what you need.
-//       case SL_NUM:  return SMART_LAYER_SL;
+//       case SL_NUM:  cfg->retrigger_extends = true; return SMART_LAYER_SL;
 //       case SLT_TAB: cfg->timeout = 500; return SMART_LAYER_SLT;
 //     }
 //     return SMART_LAYER_NONE;
@@ -73,7 +79,7 @@
 
 // Default idle timeout for a sticky layer, in milliseconds.
 #ifndef SMART_LAYER_DEFAULT_TIMEOUT
-#    define SMART_LAYER_DEFAULT_TIMEOUT 3000
+#    define SMART_LAYER_DEFAULT_TIMEOUT 1000
 #endif
 
 // Default for whether the key that triggers an automatic exit is swallowed
@@ -88,6 +94,16 @@
 #    define SMART_LAYER_SL_DOUBLE_TAP_LOCK 1
 #endif
 
+// Whether re-triggering an already-active trigger extends its sticky layer
+// instead of turning it off. When enabled, a tap of an active SL trigger (or a
+// hold of an active SLT trigger) keeps the layer on and restarts its idle
+// timeout, as if the trigger were a whitelisted key. A double tap within the
+// quick-tap window still locks the layer, and a locked layer is still turned
+// off by tapping its trigger.
+#ifndef SMART_LAYER_RETRIGGER_EXTENDS
+#    define SMART_LAYER_RETRIGGER_EXTENDS 1
+#endif
+
 typedef enum {
     SMART_LAYER_NONE = 0,
     SMART_LAYER_SL,  // tap activates a sticky layer, hold is native MO
@@ -97,6 +113,7 @@ typedef enum {
 typedef struct {
     uint16_t        timeout;            // ms; 0 disables the timeout
     bool            swallow_exit;       // swallow the key that exits the layer
+    bool            retrigger_extends;  // extend the timeout instead of exiting
     const uint16_t *continue_list;      // extra keycodes that keep the layer on
     uint8_t         continue_list_size;
 } smart_layer_config_t;

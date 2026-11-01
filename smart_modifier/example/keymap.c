@@ -7,9 +7,9 @@
 // Triggers are ordinary modifier and Mod-Tap keycodes; only the ones the
 // callback opts in get the lingering behaviour. Every other key stays native.
 //
-//   KC_LSFT        Shift; lingers 250 ms after release, double tap locks it
+//   KC_LSFT        Shift; lingers 1000 ms after release, double tap locks it
 //   KC_RCTL        right Ctrl; lingers 500 ms
-//   LGUI_T(KC_I)   tap = i, hold = GUI; the GUI lingers 250 ms after the hold
+//   LGUI_T(KC_I)   tap = i, hold = GUI; the GUI lingers 1000 ms after the hold
 //   KC_LALT        a plain Alt, never declared, so it stays fully native
 //   LSFT_T(KC_A)   a plain Mod-Tap, never declared, so it stays fully native
 
@@ -21,10 +21,10 @@ smart_modifier_mode_t smart_modifier_get(uint16_t keycode, smart_modifier_config
     // `cfg` arrives pre-filled with the defaults; override as needed.
     switch (keycode) {
         case KC_LSFT:
-            return SMART_MODIFIER_MOD; // Default 250 ms, double tap locks.
+            return SMART_MODIFIER_MOD; // Default 1000 ms, double tap locks.
 
         case KC_RCTL:
-            cfg->timeout = 500; // Override the default 250 ms.
+            cfg->timeout = 500; // Override the default 1000 ms.
             return SMART_MODIFIER_MOD;
 
         case LGUI_T(KC_I):

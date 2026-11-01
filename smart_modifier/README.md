@@ -14,7 +14,7 @@ QMK 社区模块「智能 Modifier」：让普通 modifier（如 `KC_LSFT`）和
 
 典型场景：按住 Shift 连打几个字母，在最后一个字母抬起前 Shift 已经松开了，结果最后一个字母变小写；或者按住 GUI 点了一个键，想再点一个还得重新按住。
 
-本模块让 mod **多留一会儿**：触发键（普通 modifier 键，或 Mod-Tap 的 hold 半边）松手之后，mod 继续有效一小段时间（默认 250ms，滚动窗口），这一串快速按键都能带上修饰键。
+本模块让 mod **多留一会儿**：触发键（普通 modifier 键，或 Mod-Tap 的 hold 半边）松手之后，mod 继续有效一小段时间（默认 1000ms，滚动窗口），这一串快速按键都能带上修饰键。
 
 ---
 
@@ -34,7 +34,7 @@ QMK 社区模块「智能 Modifier」：让普通 modifier（如 `KC_LSFT`）和
 
 ### 超时
 
-- **滞留超时** `SMART_MODIFIER_TIMEOUT`（默认 250ms）：触发键松手后 mod 继续有效的时长；`0` = 不滞留（松手即失效，双击锁定不受影响）。
+- **滞留超时** `SMART_MODIFIER_TIMEOUT`（默认 1000ms）：触发键松手后 mod 继续有效的时长；`0` = 不滞留（松手即失效，双击锁定不受影响）。
 - 每个键都能在回调里用 `cfg->timeout` 单独覆盖，粒度到触发键。
 
 ---
@@ -65,10 +65,10 @@ smart_modifier_mode_t smart_modifier_get(uint16_t keycode, smart_modifier_config
     // 进入回调时 cfg 已填好默认值，只改你需要改的。
     switch (keycode) {
         case KC_LSFT:
-            return SMART_MODIFIER_MOD;      // 默认 250ms，双击锁定
+            return SMART_MODIFIER_MOD;      // 默认 1000ms，双击锁定
 
         case KC_RCTL:
-            cfg->timeout = 500;             // 覆盖默认 250ms
+            cfg->timeout = 500;             // 覆盖默认 1000ms
             return SMART_MODIFIER_MOD;
 
         case LGUI_T(KC_I):
@@ -101,14 +101,14 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
 
 | 字段 | 默认 | 说明 |
 |---|---|---|
-| `timeout` | `SMART_MODIFIER_TIMEOUT` (250) | 滞留超时，毫秒；`0` = 不滞留（双击锁定不受影响） |
+| `timeout` | `SMART_MODIFIER_TIMEOUT` (1000) | 滞留超时，毫秒；`0` = 不滞留（双击锁定不受影响） |
 | `lock` | `SMART_MODIFIER_LOCK` (1) | 该键是否允许双击锁定（仅普通 modifier 有效） |
 
 ### config.h 全局宏
 
 | 宏 | 默认 | 说明 |
 |---|---|---|
-| `SMART_MODIFIER_TIMEOUT` | `250` | 默认滞留超时（毫秒）；`0` = 不滞留 |
+| `SMART_MODIFIER_TIMEOUT` | `1000` | 默认滞留超时（毫秒）；`0` = 不滞留 |
 | `SMART_MODIFIER_LOCK` | `1` | 是否启用普通 modifier 的双击锁定 |
 | `SMART_MODIFIER_MAX_ACTIVE` | `4` | 同时滞留的触发键上限（实现容量；超出时该触发键退化为原生） |
 
@@ -170,7 +170,7 @@ A plain `KC_LSFT` / `KC_RCTL` is active only while it is held, and the mod half 
 
 Classic case: hold Shift and type several letters, but release Shift a moment before the last letter is released — the last letter comes out lowercase. Or hold GUI, press one key, and you have to hold GUI again for the next one.
 
-This module lets the mod **linger a little longer**: after the trigger (a plain modifier key, or the hold half of a Mod-Tap) is released, the mod stays active for a short time (250 ms by default, a rolling window), so a fast burst of keys all gets the modifier.
+This module lets the mod **linger a little longer**: after the trigger (a plain modifier key, or the hold half of a Mod-Tap) is released, the mod stays active for a short time (1000 ms by default, a rolling window), so a fast burst of keys all gets the modifier.
 
 ---
 
@@ -190,7 +190,7 @@ Only keycodes the callback declares are affected; every other key (other modifie
 
 ### Timeouts
 
-- **Linger timeout** `SMART_MODIFIER_TIMEOUT` (default 250 ms): how long the mod stays active after the trigger is released; `0` disables lingering (the mod goes away as soon as the trigger is released; the double-tap lock still works).
+- **Linger timeout** `SMART_MODIFIER_TIMEOUT` (default 1000 ms): how long the mod stays active after the trigger is released; `0` disables lingering (the mod goes away as soon as the trigger is released; the double-tap lock still works).
 - Every key can override it per trigger with `cfg->timeout`.
 
 ---
@@ -221,10 +221,10 @@ smart_modifier_mode_t smart_modifier_get(uint16_t keycode, smart_modifier_config
     // `cfg` is pre-filled with the defaults; only change what you need.
     switch (keycode) {
         case KC_LSFT:
-            return SMART_MODIFIER_MOD;      // 250 ms by default, double tap locks
+            return SMART_MODIFIER_MOD;      // 1000 ms by default, double tap locks
 
         case KC_RCTL:
-            cfg->timeout = 500;             // override the default 250 ms
+            cfg->timeout = 500;             // override the default 1000 ms
             return SMART_MODIFIER_MOD;
 
         case LGUI_T(KC_I):
@@ -257,14 +257,14 @@ When `smart_modifier_get()` is called, `cfg` is pre-filled with these defaults:
 
 | Field | Default | Description |
 |---|---|---|
-| `timeout` | `SMART_MODIFIER_TIMEOUT` (250) | linger timeout in ms; `0` disables lingering (the double-tap lock still works) |
+| `timeout` | `SMART_MODIFIER_TIMEOUT` (1000) | linger timeout in ms; `0` disables lingering (the double-tap lock still works) |
 | `lock` | `SMART_MODIFIER_LOCK` (1) | whether this key allows the double-tap lock (plain modifiers only) |
 
 ### config.h globals
 
 | Macro | Default | Description |
 |---|---|---|
-| `SMART_MODIFIER_TIMEOUT` | `250` | default linger timeout (ms); `0` disables |
+| `SMART_MODIFIER_TIMEOUT` | `1000` | default linger timeout (ms); `0` disables |
 | `SMART_MODIFIER_LOCK` | `1` | enable the plain-modifier double-tap lock |
 | `SMART_MODIFIER_MAX_ACTIVE` | `4` | max triggers lingering at once (implementation capacity; beyond it a trigger falls back to native) |
 

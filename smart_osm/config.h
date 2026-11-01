@@ -8,7 +8,7 @@
 // file defines nothing; the defaults live in smart_osm.h behind #ifndef
 // guards and can be overridden from your keymap's config.h:
 //
-//   #define SMART_OSM_TIMEOUT 250
+//   #define SMART_OSM_TIMEOUT 500
 //   #define SMART_OSM_QUEUE_TIMEOUT 0
 //   #define SMART_OSM_LOCK 1
 

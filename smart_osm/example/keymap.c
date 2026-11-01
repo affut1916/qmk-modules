@@ -7,8 +7,8 @@
 // Triggers are ordinary OSM keys; only the ones the callback opts in get the
 // lingering behaviour. Every other OSM key stays native.
 //
-//   OSM(MOD_LSFT)  tap = Shift that lingers a moment  (default 250 ms)
-//   OSM(MOD_LCTL)  tap = Ctrl that lingers longer       (500 ms)
+//   OSM(MOD_LSFT)  tap = Shift that lingers a moment  (default 500 ms)
+//   OSM(MOD_LCTL)  tap = Ctrl that lingers longer       (800 ms)
 //   OSM(MOD_LALT)  tap = plain native One Shot Alt
 
 #include QMK_KEYBOARD_H
@@ -22,7 +22,7 @@ smart_osm_mode_t smart_osm_get(uint16_t keycode, smart_osm_config_t *cfg) {
             return SMART_OSM_OSM;
 
         case OSM(MOD_LCTL):
-            cfg->timeout       = 500; // Override the default 250 ms.
+            cfg->timeout       = 800; // Override the default 500 ms.
             cfg->queue_timeout = 1000; // Give up if no key follows within 1 s.
             return SMART_OSM_OSM;
     }

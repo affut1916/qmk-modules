@@ -9,8 +9,9 @@
 // guards and can be overridden from your keymap's config.h:
 //
 //   #define SMART_LAYER_MAX_ACTIVE 8
-//   #define SMART_LAYER_DEFAULT_TIMEOUT 300
+//   #define SMART_LAYER_DEFAULT_TIMEOUT 1000
 //   #define SMART_LAYER_SWALLOW_EXIT 0
 //   #define SMART_LAYER_SL_DOUBLE_TAP_LOCK 1
+//   #define SMART_LAYER_RETRIGGER_EXTENDS 0
 
 #pragma once

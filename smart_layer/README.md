@@ -61,7 +61,15 @@ QMK 智能层（Smart Layer）社区模块。灵感与功能移植自 urob 的 Z
 
 把 `smart_layer/` 放到 QMK userspace 或 firmware 的 `modules/affut1916` 目录下：
 
+```bash
+# userspace
+mkdir -p <QMK_USERSPACE>/modules/affut1916
+cp -r smart_layer <QMK_USERSPACE>/modules/affut1916/
 
+# 或直接放进 firmware
+mkdir -p /path/to/qmk_firmware/modules/affut1916
+cp -r smart_layer /path/to/qmk_firmware/modules/affut1916/
+```
 
 ### 2. 在 keymap.json 中启用
 
@@ -73,7 +81,7 @@ QMK 智能层（Smart Layer）社区模块。灵感与功能移植自 urob 的 Z
 }
 ```
 
-如果已有 `keymap.json`，把 `"smart_layer"` 加入 `modules` 数组即可。
+如果已有 `keymap.json`，把 `"affut1916/smart_layer"` 加入 `modules` 数组即可。
 
 模块会提供一个键码 `SMART_LAYER_OFF`（别名 `SL_OFF`）。
 
@@ -106,10 +114,11 @@ smart_layer_mode_t smart_layer_get(uint16_t keycode, smart_layer_config_t *cfg) 
     // 进入回调时 cfg 已经填好默认值，只改你需要改的。
     switch (keycode) {
         case SL_NUM:
+            cfg->retrigger_extends = true; // 已激活时再次触发 → 续期而不是关闭
             return SMART_LAYER_SL;
 
         case SLT_TAB:
-            cfg->timeout = 500; // 覆盖默认的 3000ms
+            cfg->timeout = 500; // 覆盖默认的 1000ms
             return SMART_LAYER_SLT;
     }
     return SMART_LAYER_NONE;
@@ -149,7 +158,7 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
 
 - **单击（tap）**：激活（粘滞）Num 层。松手后层保持开启。
 - **窗口内双击**：**锁定**该层。锁定后无视超时、无视白名单，只能再次单击解锁（解锁会顺带关层）或按 `SL_OFF`。双击锁定由全局开关 `SMART_LAYER_SL_DOUBLE_TAP_LOCK`（默认开）控制。
-- **再次单击**（双击窗口之外）：关闭该层。
+- **再次单击**（双击窗口之外）：关闭该层；若开启 `retrigger_extends`，则不关闭，而是保持开启并重新开始空闲计时（效果等同按了一个白名单键）。
 - **按住（hold）**：就是原生 `MO(NUM)`，按住期间开、松手即关。
 
 ### SLT — tap 输字符，hold 开层
@@ -158,7 +167,7 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
 
 - **单击（tap）**：输出 `KC_TAB`，与普通 LT 完全一样（包含原生 quick-tap 连击：快速点按再按住会重复 Tab）。
 - **按住（hold）**：激活（粘滞）NAV 层，松手后层保持开启。
-- **再次按住**：关闭该层。
+- **再次按住**：关闭该层；若开启 `retrigger_extends`，则保持开启并重新开始空闲计时。
 
 也就是说，**SL 把“粘滞”放在 tap 上，SLT 把“粘滞”放在 hold 上**，你可以按手感自由选择。
 
@@ -191,7 +200,7 @@ combo_t key_combos[] = {
    默认白名单规则：该键在你**目标层上对应位置有定义**（即不是 `KC_TRANSPARENT`），就算“属于该层”，层继续开着；否则关闭。
    例如 Num 层在 `BSPC` 的位置定义了 Backspace，那按 `BSPC` 不会关层；按一个 Num 层上没有的字母就会关层。
 
-2. **空闲超时到达**（默认 3000ms，可逐键覆盖；设为 `0` 表示禁用）。
+2. **空闲超时到达**（默认 1000ms，可逐键覆盖；设为 `0` 表示禁用）。
    只要**当前有任意键被按住**，超时暂停，不会被截断。
 
 3. **按下 `SL_OFF`**：清除所有智能层（若启用了 Caps Word，一并关闭）。
@@ -209,8 +218,9 @@ combo_t key_combos[] = {
 
 | 字段 | 默认 | 说明 |
 |---|---|---|
-| `timeout` | `SMART_LAYER_DEFAULT_TIMEOUT` (3000) | 空闲超时，毫秒；`0` 禁用 |
+| `timeout` | `SMART_LAYER_DEFAULT_TIMEOUT` (1000) | 空闲超时，毫秒；`0` 禁用 |
 | `swallow_exit` | `SMART_LAYER_SWALLOW_EXIT` (0) | 触发自动退出的那个键是否被吞掉（不发送） |
+| `retrigger_extends` | `SMART_LAYER_RETRIGGER_EXTENDS` (0) | 已激活时再次触发该键，是否保持开启并刷新超时（而不是关闭） |
 | `continue_list` | `NULL` | 额外白名单键码数组 |
 | `continue_list_size` | `0` | 上面数组的长度 |
 
@@ -244,9 +254,10 @@ case SL_NUM:
 | 宏 | 默认 | 说明 |
 |---|---|---|
 | `SMART_LAYER_MAX_ACTIVE` | `8` | 同时追踪的粘滞层数量上限（与 `MAX_LAYER` 无关） |
-| `SMART_LAYER_DEFAULT_TIMEOUT` | `3000` | 默认空闲超时（毫秒） |
+| `SMART_LAYER_DEFAULT_TIMEOUT` | `1000` | 默认空闲超时（毫秒） |
 | `SMART_LAYER_SWALLOW_EXIT` | `0` | 默认是否吞掉退出触发键 |
 | `SMART_LAYER_SL_DOUBLE_TAP_LOCK` | `1` | 是否启用 SL 双击锁定 |
+| `SMART_LAYER_RETRIGGER_EXTENDS` | `0` | 默认是否把“已激活时再次触发”当作续期而不是关闭 |
 
 ---
 
@@ -255,6 +266,8 @@ case SL_NUM:
 - **触发键在它激活的层上必须保持透明（`KC_TRANSPARENT`）**。否则层开启后该位置会解析成别的键码，导致你无法再次 tap/hold 它来关闭。这是最重要的一条。
 - **智能层互相独立**：激活一个智能层**不会**关闭另一个。每个层各自被白名单、超时或 `SL_OFF` 关闭。这与 urob 原版 `auto-layer` 的语义一致。
 - **三种“层激活动作”不算普通按键**，所以不会关闭其它智能层：SL tap、SL hold、SLT hold。
+- **重复触发续期**：默认再次触发已激活的层会关闭它；开启 `retrigger_extends` 后改为保持开启并刷新超时（类似按了一个白名单键）。`timeout == 0` 时层本来就不会超时，续期没有额外效果。
+- **双击锁定优先于续期**：开启续期后，快速双击仍会锁定；锁定层再次点击仍会关闭（解锁），所以触发键仍然可以关层。
 - **SLT 的 tap 算普通按键**（它真的发送了一个字符），因此**会**参与白名单、可能关闭其它智能层。这是符合直觉的行为。
 - 因为底层就是原生 `LT`，与 HRM（`CHORDAL_HOLD` 等）完全兼容，无需额外配置。
 - 触发键按 **keycode** 追踪，因此层开启后仍能识别同一个 LT，直接键与 combo 输出也共用同一个粘滞层。
@@ -278,6 +291,7 @@ case SL_NUM:
 - **未经实机测试**。本模块由 AI 编写，尚待真实键盘验证；请在合入日常使用前充分测试。
 - 行为基于 QMK `master` 的社区模块 API（`ASSERT_COMMUNITY_MODULES_MIN_API_VERSION(1, 1, 0)`），较旧的 QMK 版本可能不兼容。
 - split 键盘、`swallow_exit` 与 combo 的组合等边界场景未经验证。
+- `SMART_LAYER_MAX_ACTIVE` 个槽位用满时，新的触发键不会生效：SL 的 tap 无效果，SLT 的 hold 也不会退回原生 `MO`。
 - combo 输出的触发键若在 `QUICK_TAP_TERM` 窗口内被快速二次触发，会按双击锁定处理。
 
 ---
@@ -351,7 +365,15 @@ The module only decides **when a sticky layer closes**.
 
 Put `smart_layer/` under the `modules/affut1916` directory of your QMK userspace or firmware:
 
+```bash
+# userspace
+mkdir -p <QMK_USERSPACE>/modules/affut1916
+cp -r smart_layer <QMK_USERSPACE>/modules/affut1916/
 
+# or straight into the firmware
+mkdir -p /path/to/qmk_firmware/modules/affut1916
+cp -r smart_layer /path/to/qmk_firmware/modules/affut1916/
+```
 
 ### 2. Enable it in keymap.json
 
@@ -363,7 +385,7 @@ Create a `keymap.json` if you don't have one:
 }
 ```
 
-Otherwise add `"smart_layer"` to the existing `modules` array.
+Otherwise add `"affut1916/smart_layer"` to the existing `modules` array.
 
 The module provides one keycode, `SMART_LAYER_OFF` (alias `SL_OFF`).
 
@@ -396,10 +418,11 @@ smart_layer_mode_t smart_layer_get(uint16_t keycode, smart_layer_config_t *cfg) 
     // `cfg` is pre-filled with the defaults; only change what you need.
     switch (keycode) {
         case SL_NUM:
+            cfg->retrigger_extends = true; // re-trigger extends instead of closing
             return SMART_LAYER_SL;
 
         case SLT_TAB:
-            cfg->timeout = 500; // override the default 3000 ms
+            cfg->timeout = 500; // override the default 1000 ms
             return SMART_LAYER_SLT;
     }
     return SMART_LAYER_NONE;
@@ -439,7 +462,7 @@ The tap/hold meanings are **complementary**:
 
 - **tap**: activate (stick) the Num layer. It stays on after release.
 - **double-tap within the window**: **lock** the layer. A locked layer ignores both the timeout and the whitelist; tap again to unlock (which turns it off) or press `SL_OFF`. Controlled by `SMART_LAYER_SL_DOUBLE_TAP_LOCK` (default on).
-- **tap again** (outside the double-tap window): turn the layer off.
+- **tap again** (outside the double-tap window): turn the layer off; with `retrigger_extends` enabled, keep it on and restart the idle timeout instead (like pressing a whitelisted key).
 - **hold**: native `MO(NUM)` — on while held, off on release.
 
 ### SLT — tap sends a character, hold turns the layer on
@@ -448,7 +471,7 @@ The tap/hold meanings are **complementary**:
 
 - **tap**: send `KC_TAB`, exactly like a normal LT (including native quick-tap repeat).
 - **hold**: activate (stick) the NAV layer; it stays on after release.
-- **hold again**: turn the layer off.
+- **hold again**: turn the layer off; with `retrigger_extends` enabled, keep it on and restart the idle timeout instead.
 
 In short: **SL puts "sticky" on tap, SLT puts "sticky" on hold** — pick whichever feels right.
 
@@ -481,7 +504,7 @@ A sticky layer closes when any of these happens:
    Default whitelist: if the key has a definition (not `KC_TRANSPARENT`) at that position on the target layer, it belongs to the layer and the layer stays on; otherwise it closes.
    E.g. if the Num layer defines Backspace at the `BSPC` position, pressing `BSPC` keeps the layer on; pressing a letter not on the Num layer closes it.
 
-2. **The idle timeout elapses** (default 3000 ms, per-key overridable; `0` disables it).
+2. **The idle timeout elapses** (default 1000 ms, per-key overridable; `0` disables it).
    While **any key is held**, the timeout is suspended, so a long keypress never cuts the layer short.
 
 3. **`SL_OFF` is pressed**: clears every smart layer (also turns Caps Word off, if enabled).
@@ -499,8 +522,9 @@ When `smart_layer_get()` is called, `cfg` is pre-filled with these defaults:
 
 | Field | Default | Description |
 |---|---|---|
-| `timeout` | `SMART_LAYER_DEFAULT_TIMEOUT` (3000) | idle timeout in ms; `0` disables |
+| `timeout` | `SMART_LAYER_DEFAULT_TIMEOUT` (1000) | idle timeout in ms; `0` disables |
 | `swallow_exit` | `SMART_LAYER_SWALLOW_EXIT` (0) | whether the auto-exit key is swallowed (not sent) |
+| `retrigger_extends` | `SMART_LAYER_RETRIGGER_EXTENDS` (0) | when the layer is already on, extend its timeout instead of turning it off |
 | `continue_list` | `NULL` | extra whitelist keycodes |
 | `continue_list_size` | `0` | length of the array above |
 
@@ -534,9 +558,10 @@ Override in your `config.h`:
 | Macro | Default | Description |
 |---|---|---|
 | `SMART_LAYER_MAX_ACTIVE` | `8` | max tracked sticky layers (unrelated to `MAX_LAYER`) |
-| `SMART_LAYER_DEFAULT_TIMEOUT` | `3000` | default idle timeout (ms) |
+| `SMART_LAYER_DEFAULT_TIMEOUT` | `1000` | default idle timeout (ms) |
 | `SMART_LAYER_SWALLOW_EXIT` | `0` | default for swallowing the exit key |
 | `SMART_LAYER_SL_DOUBLE_TAP_LOCK` | `1` | enable SL double-tap lock |
+| `SMART_LAYER_RETRIGGER_EXTENDS` | `0` | default for extending instead of closing on a re-trigger |
 
 ---
 
@@ -545,6 +570,8 @@ Override in your `config.h`:
 - **A trigger must be transparent (`KC_TRANSPARENT`) on the layer it activates.** Otherwise, once the layer is on, that position resolves to a different keycode and you cannot tap/hold it again to close. This is the most important rule.
 - **Smart layers are independent**: activating one does **not** close another. Each closes on its own via the whitelist, timeout, or `SL_OFF`. This matches urob's original `auto-layer` semantics.
 - **The three layer-activation halves are not ordinary presses**, so they do not close other smart layers: SL tap, SL hold, SLT hold.
+- **Re-trigger extends**: by default re-triggering an active layer turns it off; with `retrigger_extends` it stays on and its idle timeout restarts (like pressing a whitelisted key). With `timeout == 0` the layer never times out anyway, so the option has no extra effect.
+- **The double-tap lock wins over extending**: a fast double tap still locks the layer, and a locked layer is still turned off by tapping its trigger, so the trigger can always close it.
 - **An SLT tap is an ordinary key** (it really sends a character), so it **does** participate in the whitelist and may close other smart layers. That is the intuitive behavior.
 - Because it builds on native `LT`, it is fully compatible with HRM (`CHORDAL_HOLD`, etc.) with no extra configuration.
 - Triggers are tracked by **keycode**, so the same LT stays identifiable once the layer is on, and a direct key and a combo output share one sticky layer.
@@ -568,6 +595,7 @@ Override in your `config.h`:
 - **Not tested on hardware.** This module is AI-authored and awaits validation on a real keyboard; test thoroughly before daily use.
 - Targets QMK `master`'s community-module API (`ASSERT_COMMUNITY_MODULES_MIN_API_VERSION(1, 1, 0)`); older QMK may be incompatible.
 - Edge cases such as split keyboards and `swallow_exit` combined with combos are unverified.
+- When all `SMART_LAYER_MAX_ACTIVE` slots are taken, a new trigger has no effect: an SL tap does nothing and an SLT hold does not fall back to native `MO`.
 - A combo output trigger rapidly re-triggered within `QUICK_TAP_TERM` is treated as a double tap and locks the layer.
 
 ---

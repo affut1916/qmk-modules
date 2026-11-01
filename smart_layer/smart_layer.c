@@ -10,6 +10,11 @@
 //   SL  = LT(layer, KC_NO)   tap  -> sticky layer, hold -> native MO
 //   SLT = LT(layer, kc)      tap  -> native kc,    hold -> sticky layer
 //
+// Re-triggering an already-active trigger normally turns its layer off. With
+// retrigger_extends it keeps the layer on and restarts the idle timeout, like
+// pressing a whitelisted key. A double tap still locks the layer, and a locked
+// layer is still turned off by tapping its trigger.
+//
 // Triggers are identified by keycode, not by matrix position. A combo that
 // emits an LT produces a COMBO_EVENT with key == (0,0); matching on keycode
 // lets the same LT reliably toggle its sticky layer whether it is a physical
@@ -110,6 +115,9 @@ static void refresh_activity(void) {
 }
 
 static bool continue_list_match(const smart_active_t *slot, uint16_t keycode) {
+    if (slot->continue_list == NULL) {
+        return false;
+    }
     for (uint8_t i = 0; i < slot->continue_list_size; i++) {
         if (slot->continue_list[i] == keycode) {
             return true;
@@ -137,6 +145,7 @@ static bool keeps_layer_on(const smart_active_t *slot, uint16_t keycode, keyreco
 static smart_layer_mode_t get_config(uint16_t keycode, smart_layer_config_t *cfg) {
     cfg->timeout            = SMART_LAYER_DEFAULT_TIMEOUT;
     cfg->swallow_exit       = SMART_LAYER_SWALLOW_EXIT;
+    cfg->retrigger_extends  = SMART_LAYER_RETRIGGER_EXTENDS;
     cfg->continue_list      = NULL;
     cfg->continue_list_size = 0;
     return smart_layer_get(keycode, cfg);
@@ -153,14 +162,15 @@ static smart_active_t *activate(uint16_t keycode, const smart_layer_config_t *cf
     if (slot == NULL) {
         return NULL;
     }
+    const uint16_t now = timer_read();
     *slot = (smart_active_t){
         .active             = true,
         .locked             = false,
         .layer              = layer,
         .trigger_keycode    = keycode,
         .timeout            = cfg->timeout,
-        .tap_time           = timer_read(),
-        .last_activity      = timer_read(),
+        .tap_time           = now,
+        .last_activity      = now,
         .swallow_exit       = cfg->swallow_exit,
         .continue_list      = cfg->continue_list,
         .continue_list_size = cfg->continue_list_size,
@@ -171,14 +181,12 @@ static smart_active_t *activate(uint16_t keycode, const smart_layer_config_t *cf
 
 // ---- Trigger handling ------------------------------------------------------
 
-// SL tap (tap.count > 0 on press): activate / toggle off / lock / unlock.
-static void sl_tap(uint16_t keycode, keyrecord_t *record) {
-    smart_layer_config_t cfg;
-    (void)get_config(keycode, &cfg);
-
+// SL tap (tap.count > 0 on press): activate / toggle off / lock / unlock /
+// extend. `cfg` is the config already fetched by process_record_smart_layer().
+static void sl_tap(uint16_t keycode, keyrecord_t *record, const smart_layer_config_t *cfg) {
     smart_active_t *slot = find_by_keycode(keycode);
     if (slot == NULL) {
-        activate(keycode, &cfg);
+        activate(keycode, cfg);
         return;
     }
     if (slot->locked) {
@@ -187,22 +195,29 @@ static void sl_tap(uint16_t keycode, keyrecord_t *record) {
     }
     if (SMART_LAYER_SL_DOUBLE_TAP_LOCK && timer_elapsed(slot->tap_time) < GET_QUICK_TAP_TERM(keycode, record)) {
         slot->locked = true; // Double tap: lock.
+    } else if (cfg->retrigger_extends) {
+        // Re-trigger: behave like a whitelisted key and restart the timeout.
+        slot->last_activity = timer_read();
     } else {
         deactivate(slot); // Toggle off.
     }
     slot->tap_time = timer_read();
 }
 
-// SLT hold (tap.count == 0 on press): activate, or close if already active.
-static void slt_hold(uint16_t keycode) {
+// SLT hold (tap.count == 0 on press): activate, or close / extend if already
+// active. `cfg` is the config already fetched by process_record_smart_layer().
+static void slt_hold(uint16_t keycode, const smart_layer_config_t *cfg) {
     smart_active_t *slot = find_by_keycode(keycode);
-    if (slot != NULL) {
-        deactivate(slot); // Repeat hold closes it.
+    if (slot == NULL) {
+        activate(keycode, cfg);
         return;
     }
-    smart_layer_config_t cfg;
-    (void)get_config(keycode, &cfg);
-    activate(keycode, &cfg);
+    if (cfg->retrigger_extends) {
+        // Re-trigger: keep the layer on and restart the timeout.
+        slot->last_activity = timer_read();
+        return;
+    }
+    deactivate(slot); // Repeat hold closes it.
 }
 
 // ---- Auto-exit -------------------------------------------------------------
@@ -289,7 +304,7 @@ bool process_record_smart_layer(uint16_t keycode, keyrecord_t *record) {
         if (mode == SMART_LAYER_SL) {
             if (record->tap.count > 0) {
                 if (pressed) {
-                    sl_tap(keycode, record);
+                    sl_tap(keycode, record, &cfg);
                 }
                 return false; // Tap handled here.
             }
@@ -299,13 +314,12 @@ bool process_record_smart_layer(uint16_t keycode, keyrecord_t *record) {
         } else if (mode == SMART_LAYER_SLT) {
             if (record->tap.count == 0) {
                 if (pressed) {
-                    slt_hold(keycode);
+                    slt_hold(keycode, &cfg);
                 } else {
                     // Start the idle timeout from the trigger's release.
                     smart_active_t *slot = find_by_keycode(keycode);
                     if (slot != NULL) {
                         slot->last_activity = timer_read();
-                        slot->tap_time      = timer_read();
                     }
                 }
                 return false; // Hold handled here; tap falls through to native kc.
@@ -314,9 +328,14 @@ bool process_record_smart_layer(uint16_t keycode, keyrecord_t *record) {
     }
 
     if (pressed && check_auto_exit(keycode, record)) {
-        swallow_active = true;
-        swallowed_key  = record->event.key;
-        return false;
+        // Only one key can be swallowed at a time: a second exiting key is sent
+        // normally so the pending key's release can still be matched. Otherwise
+        // the first key's release would leak and the state would get stuck.
+        if (!swallow_active) {
+            swallow_active = true;
+            swallowed_key  = record->event.key;
+            return false;
+        }
     }
 
     return true;

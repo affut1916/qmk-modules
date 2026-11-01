@@ -8,7 +8,7 @@
 // file defines nothing; the defaults live in smart_modifier.h behind #ifndef
 // guards and can be overridden from your keymap's config.h:
 //
-//   #define SMART_MODIFIER_TIMEOUT 250
+//   #define SMART_MODIFIER_TIMEOUT 1000
 //   #define SMART_MODIFIER_LOCK 1
 //   #define SMART_MODIFIER_MAX_ACTIVE 4
 

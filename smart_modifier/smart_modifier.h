@@ -46,7 +46,7 @@
 //                                            smart_modifier_config_t *cfg) {
 //     switch (keycode) {   // `cfg` is pre-filled; only change what you need.
 //       case KC_LSFT:      return SMART_MODIFIER_MOD;
-//       case KC_RCTL:      cfg->timeout = 500; return SMART_MODIFIER_MOD;
+//       case KC_RCTL:      cfg->timeout = 1000; return SMART_MODIFIER_MOD;
 //       case LGUI_T(KC_I): return SMART_MODIFIER_MOD_TAP;
 //     }
 //     return SMART_MODIFIER_NONE;
@@ -64,7 +64,7 @@
 // 0 disables the lingering (the mod is active only while the trigger is held);
 // the double-tap lock is not affected.
 #ifndef SMART_MODIFIER_TIMEOUT
-#    define SMART_MODIFIER_TIMEOUT 400
+#    define SMART_MODIFIER_TIMEOUT 1000
 #endif
 
 // Whether a double tap of a plain-modifier trigger locks its mod. A locked mod

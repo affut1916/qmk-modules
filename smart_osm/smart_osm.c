@@ -94,6 +94,9 @@ static void so_clear(void) {
 // Mirrors native OSM, where a queued mod is only cleared once an actual key is
 // added to the report: real modifiers and layer switches do not consume it.
 static bool so_consumes(uint16_t keycode, keyrecord_t *record) {
+    if (keycode == KC_NO) {
+        return false; // No key is added to the report.
+    }
     if (IS_MODIFIER_KEYCODE(keycode)) {
         return false;
     }
@@ -103,10 +106,7 @@ static bool so_consumes(uint16_t keycode, keyrecord_t *record) {
     if (IS_QK_MOMENTARY(keycode) || IS_QK_LAYER_TAP_TOGGLE(keycode) || IS_QK_LAYER_MOD(keycode)) {
         return false;
     }
-    if (keycode >= QK_TO && keycode <= QK_TO_MAX) {
-        return false;
-    }
-    if (keycode >= QK_TOGGLE_LAYER && keycode <= QK_TOGGLE_LAYER_MAX) {
+    if (IS_QK_TO(keycode) || IS_QK_TOGGLE_LAYER(keycode) || IS_QK_DEF_LAYER(keycode)) {
         return false;
     }
 #ifdef TRI_LAYER_ENABLE
@@ -165,6 +165,9 @@ static void so_tap(uint16_t keycode, keyrecord_t *record, const smart_osm_config
         so_drop(so_active & mods);
         so_queued &= ~mods;
         so_active &= ~mods;
+        // A cancel breaks the double-tap chain: the next tap arms instead of
+        // being mistaken for the second half of a double tap.
+        so_tap_seen = false;
         if (!so_queued && !so_active) {
             so_armed_time    = 0;
             so_last_activity = 0;

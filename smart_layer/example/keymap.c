@@ -10,7 +10,8 @@
 //   2  NUM
 //
 // Triggers are ordinary LT keys:
-//   SL_NUM  = LT(NUM, KC_NO)   tap = sticky Num (double-tap locks), hold = MO(NUM)
+//   SL_NUM  = LT(NUM, KC_NO)   tap = sticky Num (double-tap locks, re-tap extends)
+//                              hold = MO(NUM)
 //   SLT_TAB = LT(NAV, KC_TAB)  tap = Tab, hold = sticky Nav
 // A plain LT(NAV, KC_SPC) coexists and behaves natively.
 
@@ -27,10 +28,12 @@ smart_layer_mode_t smart_layer_get(uint16_t keycode, smart_layer_config_t *cfg) 
     // `cfg` arrives pre-filled with the defaults; override as needed.
     switch (keycode) {
         case SL_NUM:
+            // Tapping SL_NUM while Num is on extends it instead of closing it.
+            cfg->retrigger_extends = true;
             return SMART_LAYER_SL; // Double-tap lock is controlled by
                                    // SMART_LAYER_SL_DOUBLE_TAP_LOCK (default on).
         case SLT_TAB:
-            cfg->timeout = 500; // Override the default 3000 ms.
+            cfg->timeout = 500; // Override the default 1000 ms.
             return SMART_LAYER_SLT;
     }
     return SMART_LAYER_NONE;

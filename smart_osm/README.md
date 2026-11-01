@@ -14,7 +14,7 @@ QMK「智能 OSM」社区模块：一个更聪明的 One Shot Modifier（OSM）�
 
 典型场景：点一下 `OSM(MOD_LSFT)`，然后快速连打几个字母想全大写。第一个字母抬起后 Shift 就没了，后面的字母全变回小写。
 
-本模块让 mod **多留一会儿**：消费键抬起后，mod 继续有效一小段时间（默认 250ms，滚动窗口），所以一串快速按键都能带上修饰键，而你只需要点一次 OSM。
+本模块让 mod **多留一会儿**：消费键抬起后，mod 继续有效一小段时间（默认 500ms，滚动窗口），所以一串快速按键都能带上修饰键，而你只需要点一次 OSM。
 
 ---
 
@@ -36,7 +36,7 @@ QMK「智能 OSM」社区模块：一个更聪明的 One Shot Modifier（OSM）�
 
 ### 超时
 
-- **滞留超时** `SMART_OSM_TIMEOUT`（默认 250ms）：消费键抬起后 mod 继续有效的时长。
+- **滞留超时** `SMART_OSM_TIMEOUT`（默认 500ms）：消费键抬起后 mod 继续有效的时长。
 - **排队超时** `SMART_OSM_QUEUE_TIMEOUT`（默认 0，即不超时）：tap 之后到第一个普通键之间的等待上限。
 
 两者都可在回调里逐键覆盖。
@@ -72,7 +72,7 @@ smart_osm_mode_t smart_osm_get(uint16_t keycode, smart_osm_config_t *cfg) {
             return SMART_OSM_OSM;
 
         case OSM(MOD_LCTL):
-            cfg->timeout       = 500;  // 覆盖默认 250ms
+            cfg->timeout       = 800;  // 覆盖默认 500ms
             cfg->queue_timeout = 1000; // 1 秒内没有键按下就放弃
             return SMART_OSM_OSM;
     }
@@ -103,14 +103,14 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
 
 | 字段 | 默认 | 说明 |
 |---|---|---|
-| `timeout` | `SMART_OSM_TIMEOUT` (250) | 滞留超时，毫秒；`0` = 不超时 |
+| `timeout` | `SMART_OSM_TIMEOUT` (500) | 滞留超时，毫秒；`0` = 不超时 |
 | `queue_timeout` | `SMART_OSM_QUEUE_TIMEOUT` (0) | 排队超时，毫秒；`0` = 不超时 |
 
 ### config.h 全局宏
 
 | 宏 | 默认 | 说明 |
 |---|---|---|
-| `SMART_OSM_TIMEOUT` | `250` | 默认滞留超时（毫秒） |
+| `SMART_OSM_TIMEOUT` | `500` | 默认滞留超时（毫秒） |
 | `SMART_OSM_QUEUE_TIMEOUT` | `0` | 默认排队超时（毫秒）；`0` = 不超时 |
 | `SMART_OSM_LOCK` | `1` | 是否启用双击锁定 |
 
@@ -157,7 +157,7 @@ A native `OSM(mod)` holds the mod for one key: it stays active until **the key y
 
 Classic case: tap `OSM(MOD_LSFT)` and then type several letters hoping for all caps. The shift disappears the moment the first letter is released, and the rest come out lowercase.
 
-This module lets the mod **linger a little longer**: after the consuming key is released, the mod stays active for a short time (250 ms by default, a rolling window). A fast burst of keys all gets the modifier, while you only tapped the OSM once.
+This module lets the mod **linger a little longer**: after the consuming key is released, the mod stays active for a short time (500 ms by default, a rolling window). A fast burst of keys all gets the modifier, while you only tapped the OSM once.
 
 ---
 
@@ -179,7 +179,7 @@ Only OSM keys the callback declares as `SMART_OSM_OSM` are affected; every other
 
 ### Timeouts
 
-- **Linger timeout** `SMART_OSM_TIMEOUT` (default 250 ms): how long the mod stays active after the consuming key is released.
+- **Linger timeout** `SMART_OSM_TIMEOUT` (default 500 ms): how long the mod stays active after the consuming key is released.
 - **Queue timeout** `SMART_OSM_QUEUE_TIMEOUT` (default 0, i.e. no timeout): how long an armed mod waits for its first ordinary key.
 
 Both can be overridden per key in the callback.
@@ -215,7 +215,7 @@ smart_osm_mode_t smart_osm_get(uint16_t keycode, smart_osm_config_t *cfg) {
             return SMART_OSM_OSM;
 
         case OSM(MOD_LCTL):
-            cfg->timeout       = 500;  // override the default 250 ms
+            cfg->timeout       = 800;  // override the default 500 ms
             cfg->queue_timeout = 1000; // give up if no key follows within 1 s
             return SMART_OSM_OSM;
     }
@@ -246,14 +246,14 @@ When `smart_osm_get()` is called, `cfg` is pre-filled with these defaults:
 
 | Field | Default | Description |
 |---|---|---|
-| `timeout` | `SMART_OSM_TIMEOUT` (250) | linger timeout in ms; `0` disables |
+| `timeout` | `SMART_OSM_TIMEOUT` (500) | linger timeout in ms; `0` disables |
 | `queue_timeout` | `SMART_OSM_QUEUE_TIMEOUT` (0) | queue timeout in ms; `0` disables |
 
 ### config.h globals
 
 | Macro | Default | Description |
 |---|---|---|
-| `SMART_OSM_TIMEOUT` | `250` | default linger timeout (ms) |
+| `SMART_OSM_TIMEOUT` | `500` | default linger timeout (ms) |
 | `SMART_OSM_QUEUE_TIMEOUT` | `0` | default queue timeout (ms); `0` disables |
 | `SMART_OSM_LOCK` | `1` | enable the double-tap lock |
 

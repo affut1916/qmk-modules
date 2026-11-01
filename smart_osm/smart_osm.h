@@ -58,7 +58,7 @@
 // milliseconds. 0 disables the lingering timeout (the mod stays until it is
 // cancelled or another trigger replaces it).
 #ifndef SMART_OSM_TIMEOUT
-#    define SMART_OSM_TIMEOUT 300
+#    define SMART_OSM_TIMEOUT 500
 #endif
 
 // How long an armed mod waits for its first ordinary key. 0 means it waits
